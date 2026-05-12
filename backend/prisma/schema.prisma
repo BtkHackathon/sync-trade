@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum CompanyRole {
+  BUYER
+  SUPPLIER
+}
+
+enum AuctionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  AWARDED
+  CANCELLED
+}
+
+enum BidStatus {
+  ACTIVE
+  WITHDRAWN
+}
+
+enum AwardStatus {
+  PENDING_DELIVERY
+  DELIVERED
+  DISPUTED
+  COMPLETED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Company {
+  id           String      @id @default(uuid())
+  name         String
+  email        String      @unique
+  passwordHash String      @map("password_hash")
+  role         CompanyRole
+  sector       String?
+  taxId        String?     @unique @map("tax_id")
+  phone        String?
+  address      String?
+  city         String?
+  country      String      @default("TR")
+  isVerified   Boolean     @default(false) @map("is_verified")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  supplierProfile SupplierProfile?
+  auctions        Auction[]        @relation("BuyerAuctions")
+  bids            Bid[]
+  documents       Document[]
+
+  @@map("companies")
+}
+
+model SupplierProfile {
+  id                 String   @id @default(uuid())
+  companyId          String   @unique @map("company_id")
+  certifications     String[]
+  specializations    String[]
+  description        String?
+  reliabilityScore   Float    @default(0) @map("reliability_score")
+  totalBids          Int      @default(0) @map("total_bids")
+  completedAuctions  Int      @default(0) @map("completed_auctions")
+  cancelledAuctions  Int      @default(0) @map("cancelled_auctions")
+  avgDeliveryDays    Int?     @map("avg_delivery_days")
+  onTimeDeliveryRate Float    @default(0) @map("on_time_delivery_rate")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("supplier_profiles")
+}
+
+model Auction {
+  id               String        @id @default(uuid())
+  title            String
+  description      String
+  category         String
+  quantity         Int
+  unit             String
+  maxBudget        Decimal       @db.Decimal(15, 2) @map("max_budget")
+  deliveryAddress  String?       @map("delivery_address")
+  deliveryDeadline DateTime      @map("delivery_deadline")
+  requirements     String[]
+  status           AuctionStatus @default(DRAFT)
+  endsAt           DateTime      @map("ends_at")
+  buyerId          String        @map("buyer_id")
+  specDocumentUrl  String?       @map("spec_document_url")
+  aiReportId       String?       @map("ai_report_id")
+  lowestBidAmount  Decimal?      @db.Decimal(15, 2) @map("lowest_bid_amount")
+  bidCount         Int           @default(0) @map("bid_count")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  buyer      Company     @relation("BuyerAuctions", fields: [buyerId], references: [id])
+  bids       Bid[]
+  awardedBid AwardedBid?
+  documents  Document[]
+
+  @@index([status, endsAt])
+  @@index([buyerId])
+  @@map("auctions")
+}
+
+model Bid {
+  id         String    @id @default(uuid())
+  auctionId  String    @map("auction_id")
+  supplierId String    @map("supplier_id")
+  amount     Decimal   @db.Decimal(15, 2)
+  note       String?
+  status     BidStatus @default(ACTIVE)
+  ipAddress  String?   @map("ip_address")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  auction    Auction     @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  supplier   Company     @relation(fields: [supplierId], references: [id])
+  awardedBid AwardedBid?
+
+  @@unique([auctionId, supplierId])
+  @@index([auctionId, amount])
+  @@map("bids")
+}
+
+model AwardedBid {
+  id          String      @id @default(uuid())
+  auctionId   String      @unique @map("auction_id")
+  bidId       String      @unique @map("bid_id")
+  supplierId  String      @map("supplier_id")
+  status      AwardStatus @default(PENDING_DELIVERY)
+  awardedAt   DateTime    @default(now()) @map("awarded_at")
+  deliveredAt DateTime?   @map("delivered_at")
+  notes       String?
+
+  auction Auction @relation(fields: [auctionId], references: [id])
+  bid     Bid     @relation(fields: [bidId], references: [id])
+
+  @@map("awarded_bids")
+}
+
+model Document {
+  id           String   @id @default(uuid())
+  companyId    String?  @map("company_id")
+  auctionId    String?  @map("auction_id")
+  type         String
+  url          String
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  company Company? @relation(fields: [companyId], references: [id])
+  auction Auction? @relation(fields: [auctionId], references: [id])
+
+  @@map("documents")
+}

@@ -1,0 +1,133 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: st-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-synctrade}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-synctrade123}
+      POSTGRES_DB: ${POSTGRES_DB:-synctrade}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-synctrade}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7
+    container_name: st-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-synctrade}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-synctrade123}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-synctrade_ai}
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: st-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/gateway/Dockerfile
+    container_name: st-gateway
+    ports:
+      - '3000:3000'
+    env_file: .env
+    depends_on:
+      - auth-service
+      - auction-service
+      - bid-service
+      - ai-service
+      - notification-service
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: st-auth
+    ports:
+      - '3001:3001'
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  auction-service:
+    build:
+      context: .
+      dockerfile: apps/auction-service/Dockerfile
+    container_name: st-auction
+    ports:
+      - '3002:3002'
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  bid-service:
+    build:
+      context: .
+      dockerfile: apps/bid-service/Dockerfile
+    container_name: st-bid
+    ports:
+      - '3003:3003'
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: apps/ai-service/Dockerfile
+    container_name: st-ai
+    ports:
+      - '3004:3004'
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    container_name: st-notification
+    ports:
+      - '3005:3005'
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
