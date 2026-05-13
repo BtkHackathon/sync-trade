@@ -67,7 +67,7 @@ export class BidsService {
       const { bid, outboxId, isNewLowest } = await this.prisma.$transaction(
         async (tx) => {
           await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM auctions WHERE id = ${dto.auctionId}::uuid FOR UPDATE`,
+            Prisma.sql`SELECT 1 FROM auctions WHERE id = ${dto.auctionId} FOR UPDATE`,
           );
 
           const auction = await tx.auction.findUnique({
@@ -296,7 +296,7 @@ export class BidsService {
       const { outboxId } = await this.prisma.$transaction(
         async (tx) => {
           await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM auctions WHERE id = ${bid.auctionId}::uuid FOR UPDATE`,
+            Prisma.sql`SELECT 1 FROM auctions WHERE id = ${bid.auctionId} FOR UPDATE`,
           );
 
           const fresh = await tx.bid.findFirst({
