@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-
-// TODO: AuctionGateway provider ekle
-// TODO: Redis bağlantısı ekle (@socket.io/redis-adapter için)
-// TODO: CommonModule ekle (JWT doğrulama için)
+import { AuctionGateway } from './gateways/auction.gateway';
+import { RedisEventsBridge } from './redis-events.bridge';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-  ],
+  imports: [ConfigModule.forRoot({ isGlobal: true })],
+  providers: [AuctionGateway, RedisEventsBridge],
 })
 export class NotificationServiceModule {}
