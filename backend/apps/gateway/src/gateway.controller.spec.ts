@@ -1,22 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { GatewayController } from './gateway.controller';
-import { GatewayService } from './gateway.service';
 
 describe('GatewayController', () => {
-  let gatewayController: GatewayController;
+  let controller: GatewayController;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [GatewayController],
-      providers: [GatewayService],
     }).compile();
 
-    gatewayController = app.get<GatewayController>(GatewayController);
+    controller = app.get(GatewayController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(gatewayController.getHello()).toBe('Hello World!');
-    });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 });
