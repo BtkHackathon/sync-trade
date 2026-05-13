@@ -1,15 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CommonModule, JwtStrategy } from '@app/common';
+import { PrismaModule } from '@app/database';
+import { EventsModule } from '@app/events';
 import { BidsModule } from './bids/bids.module';
-
-// TODO: DatabaseModule ekle
-// TODO: CommonModule ekle (JwtStrategy, guards için)
-// TODO: Redis bağlantısı ekle
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
+    CommonModule,
+    EventsModule,
+    ScheduleModule.forRoot(),
     BidsModule,
   ],
+  providers: [JwtStrategy],
 })
 export class BidServiceModule {}

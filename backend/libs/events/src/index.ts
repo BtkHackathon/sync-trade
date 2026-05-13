@@ -3,6 +3,7 @@ export * from './events.module';
 export * from './events.service';
 export * from './event-outbox.service';
 export * from './interfaces/bid-placed.event';
+export * from './interfaces/bid-withdrawn.event';
 export * from './interfaces/auction-opened.event';
 export * from './interfaces/auction-closed.event';
 export * from './interfaces/ai-analysis-completed.event';

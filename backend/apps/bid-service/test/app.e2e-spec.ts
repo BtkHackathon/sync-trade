@@ -1,24 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { BidServiceModule } from './../src/bid-service.module';
+import { BidsService } from '../src/bids/bids.service';
+import { BidServiceModule } from '../src/bid-service.module';
 
-describe('BidServiceController (e2e)', () => {
-  let app: INestApplication;
-
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+describe('BidServiceModule (e2e)', () => {
+  it('derlenir ve BidsService cozulebilir', async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [BidServiceModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
-  });
-
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+    try {
+      expect(moduleRef.get(BidsService)).toBeDefined();
+    } finally {
+      await moduleRef.close();
+    }
   });
 });

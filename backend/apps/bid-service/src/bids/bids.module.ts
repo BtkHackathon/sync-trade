@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
 import { BidsController } from './bids.controller';
 import { BidsService } from './bids.service';
-
-// TODO: DatabaseModule import et (PrismaService için)
-// TODO: Redis modülü ekle (distributed lock + Pub/Sub için)
+import { BidLockService } from './bid-lock.service';
 
 @Module({
   controllers: [BidsController],
-  providers: [BidsService],
+  providers: [BidsService, BidLockService],
 })
 export class BidsModule {}
