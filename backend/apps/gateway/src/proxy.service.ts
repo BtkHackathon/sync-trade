@@ -38,18 +38,14 @@ export class ProxyService {
         if (['transfer-encoding', 'connection', 'content-encoding'].includes(lower)) {
           continue;
         }
-        if (Array.isArray(value)) {
-          res.setHeader(name, value);
-        } else {
-          res.setHeader(name, value);
-        }
+        res.setHeader(name, value as string | string[]);
       }
       res.send(upstream.data);
     } catch (err) {
       this.logger.error(`Upstream ${key} hata: ${targetUrl}`, err instanceof Error ? err.stack : String(err));
       if (!res.headersSent) {
         res.status(502).json({
-          message: 'Upstream servise ulasilamadi.',
+          message: 'Upstream servise ulaşılamadı.',
           target: targetUrl,
         });
       }
@@ -81,6 +77,15 @@ export class ProxyService {
         out[key] = v;
       }
     }
+
+    const clientIp =
+      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
+      req.socket.remoteAddress ??
+      '';
+    if (clientIp) {
+      out['x-forwarded-for'] = clientIp;
+    }
+
     return out;
   }
 

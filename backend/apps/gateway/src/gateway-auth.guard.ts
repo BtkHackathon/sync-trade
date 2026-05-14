@@ -16,9 +16,14 @@ export class GatewayJwtAuthGuard extends JwtAuthGuard {
     const raw = (req.originalUrl ?? req.url ?? '') as string;
     const path = raw.split('?')[0];
 
-    const publicPrefixes = ['/api/health', '/api/auth/register', '/api/auth/login', '/api/docs'];
+    const publicPrefixes = [
+      '/api/health',
+      '/api/auth/register',
+      '/api/auth/login',
+      '/api/docs',
+    ];
     for (const p of publicPrefixes) {
-      if (path === p || path.startsWith(`${p}/`)) {
+      if (path === p || path.startsWith(`${p}/`) || path.startsWith(`${p}-`)) {
         return true;
       }
     }
