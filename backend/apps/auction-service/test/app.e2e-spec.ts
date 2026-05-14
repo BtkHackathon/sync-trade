@@ -1,24 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { AuctionServiceModule } from './../src/auction-service.module';
+import { AuctionsService } from '../src/auctions/auctions.service';
+import { AuctionServiceModule } from '../src/auction-service.module';
 
-describe('AuctionServiceController (e2e)', () => {
-  let app: INestApplication;
-
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+/**
+ * app.init() Prisma baglantisini acar (PostgreSQL gerekir).
+ * CI / hizli smoke icin sadece modul derlemesi.
+ */
+describe('AuctionServiceModule (e2e)', () => {
+  it('derlenir ve AuctionsService cozulebilir', async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AuctionServiceModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
-  });
-
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+    try {
+      expect(moduleRef.get(AuctionsService)).toBeDefined();
+    } finally {
+      await moduleRef.close();
+    }
   });
 });

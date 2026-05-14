@@ -1,11 +1,16 @@
+import 'dotenv/config';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, CompanyRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg(process.env.DATABASE_URL as string),
+} as any);
 
 async function main() {
   console.log('🌱 Seed verisi oluşturuluyor...');
 
+  await prisma.eventOutbox.deleteMany();
   await prisma.awardedBid.deleteMany();
   await prisma.bid.deleteMany();
   await prisma.auction.deleteMany();

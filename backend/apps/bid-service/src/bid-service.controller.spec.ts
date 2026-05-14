@@ -1,22 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BidServiceController } from './bid-service.controller';
-import { BidServiceService } from './bid-service.service';
 
+/** Root controller is reserved; HTTP surface lives under bids/. */
 describe('BidServiceController', () => {
-  let bidServiceController: BidServiceController;
+  let controller: BidServiceController;
 
   beforeEach(async () => {
     const app: TestingModule = await Test.createTestingModule({
       controllers: [BidServiceController],
-      providers: [BidServiceService],
     }).compile();
 
-    bidServiceController = app.get<BidServiceController>(BidServiceController);
+    controller = app.get(BidServiceController);
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(bidServiceController.getHello()).toBe('Hello World!');
-    });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 });

@@ -1,10 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { NotificationServiceModule } from './notification-service.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(NotificationServiceModule);
+  app.useWebSocketAdapter(new IoAdapter(app));
   const config = app.get(ConfigService);
   const logger = new Logger('NotificationService');
 
