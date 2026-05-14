@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+jobs:
+  typecheck:
+    name: TypeScript Kontrolü
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Kodu çek
+        uses: actions/checkout@v4
+
+      - name: Node.js 22 kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: backend/yarn.lock
+
+      - name: Bağımlılıkları yükle
+        run: yarn install --frozen-lockfile
+
+      - name: Prisma client oluştur
+        run: yarn db:generate
+
+      - name: Auth Service — TypeScript kontrol
+        run: npx tsc --project apps/auth-service/tsconfig.app.json --noEmit
+
+      - name: Auction Service — TypeScript kontrol
+        run: npx tsc --project apps/auction-service/tsconfig.app.json --noEmit
+
+      - name: Bid Service — TypeScript kontrol
+        run: npx tsc --project apps/bid-service/tsconfig.app.json --noEmit
+
+      - name: AI Service — TypeScript kontrol
+        run: npx tsc --project apps/ai-service/tsconfig.app.json --noEmit
+
+      - name: Notification Service — TypeScript kontrol
+        run: npx tsc --project apps/notification-service/tsconfig.app.json --noEmit
+
+      - name: Gateway — TypeScript kontrol
+        run: npx tsc --project apps/gateway/tsconfig.app.json --noEmit
