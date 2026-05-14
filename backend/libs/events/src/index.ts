@@ -6,4 +6,5 @@ export * from './interfaces/bid-placed.event';
 export * from './interfaces/bid-withdrawn.event';
 export * from './interfaces/auction-opened.event';
 export * from './interfaces/auction-closed.event';
+export * from './interfaces/auction-awarded.event';
 export * from './interfaces/ai-analysis-completed.event';

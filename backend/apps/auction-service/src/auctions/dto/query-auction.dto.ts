@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
 import { AuctionStatus } from '@app/common';
 
 export class QueryAuctionDto {
@@ -8,6 +8,11 @@ export class QueryAuctionDto {
   @IsOptional()
   @IsEnum(AuctionStatus)
   status?: AuctionStatus;
+
+  @ApiPropertyOptional({ description: 'Belirli bir alıcıya ait ihaleler ("Benim ihalelerim" için)' })
+  @IsOptional()
+  @IsUUID()
+  buyerId?: string;
 
   @ApiPropertyOptional({ example: 'Ofis Mobilyasi' })
   @IsOptional()

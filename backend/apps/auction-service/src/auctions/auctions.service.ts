@@ -16,6 +16,7 @@ import {
 import { PrismaService } from '@app/database';
 import { JwtPayload } from '@app/common';
 import {
+  AuctionAwardedEvent,
   AuctionClosedEvent,
   AuctionOpenedEvent,
   EventOutboxService,
@@ -131,29 +132,32 @@ export class AuctionsService {
   }
 
   async findOne(id: string, viewer: JwtPayload) {
+    const isOwner = viewer.role === CompanyRole.BUYER;
+
     const auction = await this.prisma.auction.findUnique({
       where: { id },
-      include: this.auctionPublicInclude,
+      include: isOwner ? this.auctionOwnerDetailInclude : this.auctionPublicInclude,
     });
 
     if (!auction) {
-      throw new NotFoundException('Ihale bulunamadi.');
+      throw new NotFoundException('İhale bulunamadı.');
     }
 
-    if (viewer.role === CompanyRole.BUYER && auction.buyerId === viewer.sub) {
-      return this.prisma.auction.findUnique({
-        where: { id },
-        include: this.auctionOwnerDetailInclude,
-      });
+    // Sahip BUYER tüm teklifleri görebilir
+    if (isOwner && auction.buyerId === viewer.sub) {
+      return auction;
     }
 
+    // Tedarikçi sadece kendi teklifini görebilir
     const bids = await this.findVisibleBidsForViewer(id, viewer);
 
     return {
       ...auction,
       bids,
       awardedBid:
-        auction.awardedBid?.supplierId === viewer.sub ? auction.awardedBid : null,
+        (auction as any).awardedBid?.supplierId === viewer.sub
+          ? (auction as any).awardedBid
+          : null,
     };
   }
 
@@ -161,7 +165,7 @@ export class AuctionsService {
     const auction = await this.getOwnedAuction(id, buyerId);
 
     if (auction.status !== AuctionStatus.DRAFT) {
-      throw new BadRequestException('Sadece taslak ihaleler guncellenebilir.');
+      throw new BadRequestException('Sadece taslak ihaleler güncellenebilir.');
     }
 
     this.assertValidAuctionDates(
@@ -196,11 +200,11 @@ export class AuctionsService {
     const auction = await this.getOwnedAuction(id, buyerId);
 
     if (auction.status !== AuctionStatus.DRAFT) {
-      throw new BadRequestException('Sadece taslak ihaleler yayina alinabilir.');
+      throw new BadRequestException('Sadece taslak ihaleler yayına alınabilir.');
     }
 
     if (auction.endsAt <= new Date()) {
-      throw new BadRequestException('Bitis tarihi gecmis ihale yayina alinamaz.');
+      throw new BadRequestException('Bitiş tarihi geçmiş ihale yayına alınamaz.');
     }
 
     const { openedAuction, outboxId } = await this.prisma.$transaction(async (tx) => {
@@ -228,7 +232,7 @@ export class AuctionsService {
     const auction = await this.getOwnedAuction(id, buyerId);
 
     if (auction.status !== AuctionStatus.OPEN) {
-      throw new BadRequestException('Sadece acik ihaleler kapatilabilir.');
+      throw new BadRequestException('Sadece açık ihaleler kapatılabilir.');
     }
 
     const { closedAuction, outboxId } = await this.prisma.$transaction(async (tx) => {
@@ -259,7 +263,7 @@ export class AuctionsService {
       auction.status !== AuctionStatus.DRAFT &&
       auction.status !== AuctionStatus.OPEN
     ) {
-      throw new BadRequestException('Bu durumdaki ihale iptal edilemez.');
+      throw new BadRequestException('Bu durumdaki ihale iptal edilemez.');  // DRAFT ve OPEN iptal edilebilir
     }
 
     return this.prisma.auction.update({
@@ -270,19 +274,21 @@ export class AuctionsService {
   }
 
   async award(id: string, bidId: string, buyerId: string) {
+    let outboxId: string;
+
     try {
-      await this.prisma.$transaction(async (tx) => {
+      outboxId = await this.prisma.$transaction(async (tx) => {
         const auction = await tx.auction.findUnique({
           where: { id },
           select: { id: true, buyerId: true, status: true },
         });
 
         if (!auction) {
-          throw new NotFoundException('Ihale bulunamadi.');
+          throw new NotFoundException('İhale bulunamadı.');
         }
 
         if (auction.buyerId !== buyerId) {
-          throw new ForbiddenException('Bu ihale uzerinde islem yapma yetkiniz yok.');
+          throw new ForbiddenException('Bu ihale üzerinde işlem yapma yetkiniz yok.');
         }
 
         const buyer = await tx.company.findUnique({
@@ -297,48 +303,56 @@ export class AuctionsService {
         });
 
         if (existingAward) {
-          throw new ConflictException('Bu ihale icin kazanan zaten secilmis.');
+          throw new ConflictException('Bu ihale için kazanan zaten seçilmiş.');
         }
 
         if (auction.status !== AuctionStatus.CLOSED) {
-          throw new BadRequestException('Kazanan secmek icin ihale once kapatilmalidir.');
+          throw new BadRequestException('Kazanan seçmek için ihale önce kapatılmalıdır.');
         }
 
         const bid = await tx.bid.findFirst({
-          where: {
-            id: bidId,
-            auctionId: id,
-            status: BidStatus.ACTIVE,
-          },
+          where: { id: bidId, auctionId: id, status: BidStatus.ACTIVE },
         });
 
         if (!bid) {
-          throw new NotFoundException('Teklif bulunamadi.');
+          throw new NotFoundException('Teklif bulunamadı.');
         }
 
         await tx.awardedBid.create({
-          data: {
-            auctionId: id,
-            bidId,
-            supplierId: bid.supplierId,
-          },
+          data: { auctionId: id, bidId, supplierId: bid.supplierId },
         });
 
         await tx.auction.update({
           where: { id },
           data: { status: AuctionStatus.AWARDED },
         });
+
+        const outboxRecord = await this.outbox.enqueue(
+          tx,
+          RedisEvents.AUCTION_AWARDED,
+          {
+            auctionId: id,
+            buyerId,
+            bidId,
+            supplierId: bid.supplierId,
+            winningAmount: Number(bid.amount),
+            awardedAt: new Date().toISOString(),
+          } satisfies AuctionAwardedEvent,
+        );
+
+        return outboxRecord.id;
       });
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Bu ihale icin kazanan zaten secilmis.');
+        throw new ConflictException('Bu ihale için kazanan zaten seçilmiş.');
       }
-
       throw error;
     }
+
+    await this.outbox.publishOne(outboxId);
 
     return this.findOne(id, { sub: buyerId, role: CompanyRole.BUYER } as JwtPayload);
   }
@@ -392,7 +406,7 @@ export class AuctionsService {
     }
 
     if (closedCount > 0) {
-      this.logger.log(`${closedCount} expired auction(s) closed.`);
+      this.logger.log(`${closedCount} ihale süresi dolduğu için kapatıldı.`);
     }
 
     return closedCount;
@@ -415,6 +429,10 @@ export class AuctionsService {
         { description: { contains: query.q, mode: 'insensitive' } },
         { category: { contains: query.q, mode: 'insensitive' } },
       ];
+    }
+
+    if (query.buyerId) {
+      where.buyerId = query.buyerId;
     }
 
     return where;
@@ -457,15 +475,15 @@ export class AuctionsService {
     buyer: { role: CompanyRole; isVerified: boolean } | null,
   ) {
     if (!buyer) {
-      throw new NotFoundException('Alici firma bulunamadi.');
+      throw new NotFoundException('Alıcı firma bulunamadı.');
     }
 
     if (buyer.role !== CompanyRole.BUYER) {
-      throw new ForbiddenException('Sadece alici firmalar ihale islemi yapabilir.');
+      throw new ForbiddenException('Sadece alıcı firmalar ihale işlemi yapabilir.');
     }
 
     if (!buyer.isVerified) {
-      throw new ForbiddenException('Firma dogrulamasi tamamlanmadan ihale islemi yapilamaz.');
+      throw new ForbiddenException('Firma doğrulaması tamamlanmadan ihale işlemi yapılamaz.');
     }
   }
 
@@ -482,11 +500,11 @@ export class AuctionsService {
     });
 
     if (!auction) {
-      throw new NotFoundException('Ihale bulunamadi.');
+      throw new NotFoundException('İhale bulunamadı.');
     }
 
     if (auction.buyerId !== buyerId) {
-      throw new ForbiddenException('Bu ihale uzerinde islem yapma yetkiniz yok.');
+      throw new ForbiddenException('Bu ihale üzerinde işlem yapma yetkiniz yok.');
     }
 
     await this.assertVerifiedBuyer(buyerId);
@@ -504,19 +522,19 @@ export class AuctionsService {
     const endDate = this.toDate(endsAt);
 
     if (requireBoth && (!deliveryDate || !endDate)) {
-      throw new BadRequestException('Teslim tarihi ve ihale bitis tarihi zorunludur.');
+      throw new BadRequestException('Teslim tarihi ve ihale bitiş tarihi zorunludur.');
     }
 
     if (deliveryDate && deliveryDate <= now) {
-      throw new BadRequestException('Teslim tarihi gelecekte olmalidir.');
+      throw new BadRequestException('Teslim tarihi gelecekte olmalıdır.');
     }
 
     if (endDate && endDate <= now) {
-      throw new BadRequestException('Ihale bitis tarihi gelecekte olmalidir.');
+      throw new BadRequestException('İhale bitiş tarihi gelecekte olmalıdır.');
     }
 
     if (deliveryDate && endDate && deliveryDate <= endDate) {
-      throw new BadRequestException('Teslim tarihi ihale bitis tarihinden sonra olmalidir.');
+      throw new BadRequestException('Teslim tarihi ihale bitiş tarihinden sonra olmalıdır.');
     }
   }
 
