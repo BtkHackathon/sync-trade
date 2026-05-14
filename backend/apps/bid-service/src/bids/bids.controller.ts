@@ -8,7 +8,7 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CompanyRole, CurrentCompany, JwtPayload, Roles } from '@app/common';
 import { BidsService } from './bids.service';
@@ -22,7 +22,7 @@ export class BidsController {
 
   @Post()
   @Roles(CompanyRole.SUPPLIER)
-  @ApiOperation({ summary: 'Teklif ver veya tutari dusur (tersine ihale)' })
+  @ApiOperation({ summary: 'Teklif ver veya tutarı düşür (tersine ihale)' })
   place(
     @CurrentCompany() company: JwtPayload,
     @Body() dto: PlaceBidDto,
@@ -37,7 +37,8 @@ export class BidsController {
 
   @Get('auction/:auctionId')
   @Roles(CompanyRole.BUYER)
-  @ApiOperation({ summary: 'Ihalenin aktif teklifleri (yalnizca ihale sahibi)' })
+  @ApiOperation({ summary: 'İhalenin aktif teklifleri (yalnızca ihale sahibi)' })
+  @ApiParam({ name: 'auctionId', description: 'İhale ID' })
   listForAuction(
     @Param('auctionId', new ParseUUIDPipe({ version: '4' })) auctionId: string,
     @CurrentCompany() company: JwtPayload,
@@ -54,7 +55,8 @@ export class BidsController {
 
   @Delete(':id')
   @Roles(CompanyRole.SUPPLIER)
-  @ApiOperation({ summary: 'Aktif teklifi geri cek (ihale acikken)' })
+  @ApiOperation({ summary: 'Aktif teklifi geri çek (ihale açıkken)' })
+  @ApiParam({ name: 'id', description: 'Teklif ID' })
   withdraw(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentCompany() company: JwtPayload,
