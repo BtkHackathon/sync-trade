@@ -9,6 +9,7 @@ const SUBSCRIBED: RedisEvents[] = [
   RedisEvents.BID_WITHDRAWN,
   RedisEvents.AUCTION_OPENED,
   RedisEvents.AUCTION_CLOSED,
+  RedisEvents.AUCTION_AWARDED,
 ];
 
 @Injectable()
@@ -53,6 +54,7 @@ export class RedisEventsBridge implements OnModuleInit, OnModuleDestroy {
         publishedAt?: string;
       };
 
+      // Frontend'e sadece payload gönder, envelope wrapper'ı değil
       const payload = envelope.payload ?? {};
       const auctionId =
         typeof payload.auctionId === 'string' ? payload.auctionId : undefined;
@@ -63,22 +65,25 @@ export class RedisEventsBridge implements OnModuleInit, OnModuleDestroy {
 
       switch (channel) {
         case RedisEvents.BID_PLACED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'bid-update', envelope);
+          this.auctionGateway.emitAuctionEvent(auctionId, 'bid-update', payload);
           break;
         case RedisEvents.BID_WITHDRAWN:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'bid-withdrawn', envelope);
+          this.auctionGateway.emitAuctionEvent(auctionId, 'bid-withdrawn', payload);
           break;
         case RedisEvents.AUCTION_OPENED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-opened', envelope);
+          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-opened', payload);
           break;
         case RedisEvents.AUCTION_CLOSED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-closed', envelope);
+          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-closed', payload);
+          break;
+        case RedisEvents.AUCTION_AWARDED:
+          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-awarded', payload);
           break;
         default:
           break;
       }
     } catch (e) {
-      this.logger.warn(`Mesaj cozumlenemedi (${channel}): ${e instanceof Error ? e.message : String(e)}`);
+      this.logger.warn(`Mesaj çözümlenemedi (${channel}): ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 }
