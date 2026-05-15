@@ -208,12 +208,15 @@ export class AnalysisService {
 
       // Step 5: Persist report
       const report = await this.persistReport(auction, aiAnalysis, fraudAnalysis, rankings);
+      if (!report) {
+        throw new Error('Failed to persist AI report.');
+      }
 
       // Step 6: Publish event
-      await this.safePublish('ANALYSIS_COMPLETE', {
+      await this.safePublish(RedisEvents.AI_ANALYSIS_COMPLETED, {
         auctionId: auction.id,
-        reportId: report._id,
-        recommendedWinner: aiAnalysis.rankings?.[0]?.supplierId,
+        reportId: report._id ?? report.id,
+        recommendedWinner: aiAnalysis.supplierRankings?.[0]?.supplierId,
       });
 
       return this.toStoredReport(report);
@@ -227,12 +230,14 @@ export class AnalysisService {
         await this.fraudAnalysis.assessBidsWithAi(this.toFraudInputs(auction.bids)),
       );
 
-      return await this.persistReport(
+      const persisted = await this.persistReport(
         auction,
         fallback,
         await this.fraudAnalysis.assessBidsWithAi(this.toFraudInputs(auction.bids)),
         this.buildRankings(auction.bids),
       );
+
+      return this.toStoredReport(persisted);
     }
   }
 
@@ -295,19 +300,26 @@ export class AnalysisService {
     }
 
     const lowest = Math.min(...bids.map((b) => b.amount));
-    const average = bids.reduce((sum, b) => b.amount, 0) / bids.length;
+    const average = bids.reduce((sum, b) => sum + b.amount, 0) / bids.length;
 
     return bids
       .sort((a, b) => a.amount - b.amount)
-      .map((bid, index) => ({
-        rank: index + 1,
-        supplierId: bid.supplierId,
-        supplierName: bid.supplier?.name ?? 'Unknown',
-        amount: bid.amount,
-        isLowest: bid.amount === lowest,
-        pricePercentile: Math.round((bid.amount / average) * 100),
-        reliability: bid.supplier?.supplierProfile?.reliabilityScore ?? 0,
-      }));
+      .map((bid, index) => {
+        const score = Math.max(0, 100 - Math.round((bid.amount / average) * 100));
+        const reliabilityScore = bid.supplier?.supplierProfile?.reliabilityScore ?? 0;
+
+        return {
+          rank: index + 1,
+          supplierId: bid.supplierId,
+          supplierName: bid.supplier?.name ?? 'Unknown',
+          bidAmount: bid.amount,
+          reliabilityScore,
+          riskLevel: reliabilityScore >= 7 ? 'LOW' : reliabilityScore >= 4 ? 'MEDIUM' : 'HIGH',
+          strengths: [],
+          risks: [],
+          aiScore: score,
+        };
+      });
   }
 
   /**
@@ -316,6 +328,7 @@ export class AnalysisService {
   private toFraudInputs(bids: any[]): BidForFraud[] {
     return bids.map((bid) => ({
       supplierId: bid.supplierId,
+      supplierName: bid.supplier?.name ?? 'Unknown',
       amount: bid.amount,
       reliabilityScore: bid.supplier?.supplierProfile?.reliabilityScore ?? 0,
       createdAt: bid.createdAt,
@@ -333,12 +346,11 @@ export class AnalysisService {
   ) {
     return this.reports.create({
       auctionId: auction.id,
-      auctionTitle: auction.title,
       buyerId: auction.buyerId,
-      analysis,
-      fraud,
-      rankings,
-      createdAt: new Date(),
+      analysisResult: analysis,
+      ragContextUsed: [],
+      modelUsed: 'gemini-1.5-pro',
+      processingTimeMs: 0,
     });
   }
 
@@ -364,18 +376,25 @@ export class AnalysisService {
     rankings: SupplierRanking[],
     fraud: FraudDetectionResult,
   ): AuctionAnalysisResult {
+    const lowestBid = rankings[0];
+
     return {
-      auctionId: auction.id,
-      title: auction.title,
-      marketInsight: `Market assessment for ${auction.category} procurement.`,
-      bidQuality: `${rankings.length} qualified bids received.`,
-      rankings: rankings.map((r) => ({
-        ...r,
-        score: 100 - r.rank * 10,
-        reasoning: `Rank ${r.rank} supplier based on price and reliability.`,
-      })),
-      recommendation: `Award to ${rankings[0]?.supplierName ?? 'lowest bidder'}.`,
-      alternateOptions: rankings.slice(1, 3).map((r) => r.supplierName),
+      summary: `Auction ${auction.title} completed with ${rankings.length} competitive bids.`,
+      lowestBid: {
+        supplierId: lowestBid?.supplierId ?? 'unknown',
+        supplierName: lowestBid?.supplierName ?? 'unknown',
+        amount: lowestBid?.bidAmount ?? 0,
+      },
+      recommendedBid: {
+        supplierId: lowestBid?.supplierId ?? 'unknown',
+        supplierName: lowestBid?.supplierName ?? 'unknown',
+        amount: lowestBid?.bidAmount ?? 0,
+        reason: 'Lowest priced supplier with acceptable reliability.',
+      },
+      supplierRankings: rankings,
+      fraudDetection: fraud,
+      marketInsights: `Market assessment for ${auction.category} procurement.`,
+      finalRecommendation: `Award to ${lowestBid?.supplierName ?? 'the lowest bidder'}.`,
     };
   }
 
@@ -403,13 +422,14 @@ export class AnalysisService {
    */
   private toStoredReport(report: any): StoredAuctionReport {
     return {
-      id: report._id.toString(),
+      reportId: String(report._id ?? report.id),
       auctionId: report.auctionId,
-      auctionTitle: report.auctionTitle,
-      analysis: report.analysis,
-      fraud: report.fraud,
-      rankings: report.rankings,
-      createdAt: report.createdAt,
+      buyerId: report.buyerId,
+      analysisResult: report.analysis,
+      ragContextUsed: report.ragContextUsed,
+      modelUsed: report.modelUsed,
+      processingTimeMs: report.processingTimeMs,
+      generatedWithFallback: report.generatedWithFallback,
     };
   }
 

@@ -40,7 +40,9 @@ export class SpecAssistantService {
 
     if (input.file.mimetype === 'application/pdf') {
       const parser = await import('pdf-parse');
-      const pdfParse = parser.default ?? parser;
+      const pdfParse = (parser.default ?? parser) as unknown as (
+        buffer: Buffer,
+      ) => Promise<{ text: string }>;
       const result = await pdfParse(input.file.buffer);
       return result.text.trim();
     }

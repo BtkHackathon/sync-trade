@@ -82,16 +82,16 @@ export class RagService {
 
       // Store in database for future retrieval
       await this.prisma.supplierEmbedding.upsert({
-        where: { supplier_id: supplierId },
+        where: { supplierId },
         update: {
           embedding: JSON.stringify(embedding),
           context: contextText,
-          updated_at: new Date(),
+          updatedAt: new Date(),
         },
         create: {
           id: `emb-${supplierId}-${Date.now()}`,
-          supplier_id: supplierId,
-          auction_id: auctionId,
+          supplierId,
+          auctionId,
           context: contextText,
           embedding: JSON.stringify(embedding),
           similarity: 0,
@@ -137,7 +137,7 @@ export class RagService {
         const similarity = this.cosineSimilarity(queryEmbedding, storedVector);
 
         return {
-          supplierId: emb.supplier_id,
+          supplierId: emb.supplierId,
           context: emb.context,
           embedding: storedVector,
           similarity,
@@ -159,7 +159,7 @@ export class RagService {
   async getSupplierContext(supplierId: string): Promise<string | null> {
     try {
       const embedding = await this.prisma.supplierEmbedding.findUnique({
-        where: { supplier_id: supplierId },
+        where: { supplierId },
       });
 
       return embedding?.context ?? null;
