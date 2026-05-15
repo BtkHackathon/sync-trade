@@ -184,3 +184,18 @@ model EventOutbox {
   @@index([status, createdAt])
   @@map("event_outbox")
 }
+
+model SupplierEmbedding {
+  id          String   @id @default(uuid())
+  supplierId  String   @unique @map("supplier_id")
+  auctionId   String   @map("auction_id")
+  context     String   @db.Text // RAG context text (supplier profile, history, etc.)
+  embedding   String   @db.Text // pgvector type stored as JSON array string
+  similarity  Float    @default(0) // Last similarity score (for ranking)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([supplierId])
+  @@index([auctionId])
+  @@map("supplier_embeddings")
+}

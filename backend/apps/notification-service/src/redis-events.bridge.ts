@@ -10,6 +10,8 @@ const SUBSCRIBED: RedisEvents[] = [
   RedisEvents.AUCTION_OPENED,
   RedisEvents.AUCTION_CLOSED,
   RedisEvents.AUCTION_AWARDED,
+  RedisEvents.AI_ANALYSIS_STARTED,
+  RedisEvents.AI_ANALYSIS_COMPLETED,
 ];
 
 @Injectable()
@@ -78,6 +80,12 @@ export class RedisEventsBridge implements OnModuleInit, OnModuleDestroy {
           break;
         case RedisEvents.AUCTION_AWARDED:
           this.auctionGateway.emitAuctionEvent(auctionId, 'auction-awarded', payload);
+          break;
+        case RedisEvents.AI_ANALYSIS_STARTED:
+          this.auctionGateway.emitAuctionEvent(auctionId, 'ai-analysis-started', payload);
+          break;
+        case RedisEvents.AI_ANALYSIS_COMPLETED:
+          this.auctionGateway.emitAuctionEvent(auctionId, 'ai-analysis-completed', payload);
           break;
         default:
           break;
