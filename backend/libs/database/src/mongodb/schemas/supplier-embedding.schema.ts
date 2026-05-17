@@ -27,4 +27,5 @@ export class SupplierEmbedding {
   updatedAt?: Date;
 }
 
-export const SupplierEmbeddingSchema = SchemaFactory.createForClass(SupplierEmbedding);
+export const SupplierEmbeddingSchema =
+  SchemaFactory.createForClass(SupplierEmbedding);

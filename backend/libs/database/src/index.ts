@@ -4,3 +4,6 @@ export * from './prisma/prisma.module';
 export * from './mongodb/mongodb.module';
 export * from './mongodb/schemas/ai-report.schema';
 export * from './mongodb/schemas/supplier-embedding.schema';
+export * from './mongodb/schemas/document-parse-log.schema';
+export * from './mongodb/schemas/fraud-detection-log.schema';
+export * from './mongodb/schemas/rag-query-log.schema';

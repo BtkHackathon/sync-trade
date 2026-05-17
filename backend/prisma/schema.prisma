@@ -6,8 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
-
 enum CompanyRole {
   BUYER
   SUPPLIER
@@ -26,6 +24,12 @@ enum BidStatus {
   WITHDRAWN
 }
 
+enum BidHistoryAction {
+  PLACED
+  UPDATED
+  WITHDRAWN
+}
+
 enum AwardStatus {
   PENDING_DELIVERY
   DELIVERED
@@ -39,8 +43,6 @@ enum OutboxEventStatus {
   PUBLISHED
   FAILED
 }
-
-// ─── Models ───────────────────────────────────────────────────────────────────
 
 model Company {
   id           String      @id @default(uuid())
@@ -61,6 +63,8 @@ model Company {
   supplierProfile SupplierProfile?
   auctions        Auction[]        @relation("BuyerAuctions")
   bids            Bid[]
+  bidHistories    BidHistory[]
+  embeddings      SupplierEmbedding[]
   documents       Document[]
 
   @@map("companies")
@@ -72,6 +76,7 @@ model SupplierProfile {
   certifications     String[]
   specializations    String[]
   description        String?
+  capacity           String?
   reliabilityScore   Float    @default(0) @map("reliability_score")
   totalBids          Int      @default(0) @map("total_bids")
   completedAuctions  Int      @default(0) @map("completed_auctions")
@@ -107,10 +112,12 @@ model Auction {
   createdAt        DateTime      @default(now()) @map("created_at")
   updatedAt        DateTime      @updatedAt @map("updated_at")
 
-  buyer      Company     @relation("BuyerAuctions", fields: [buyerId], references: [id])
-  bids       Bid[]
-  awardedBid AwardedBid?
-  documents  Document[]
+  buyer        Company      @relation("BuyerAuctions", fields: [buyerId], references: [id])
+  bids         Bid[]
+  bidHistories BidHistory[]
+  awardedBid   AwardedBid?
+  documents    Document[]
+  embeddings   SupplierEmbedding[]
 
   @@index([status, endsAt])
   @@index([buyerId])
@@ -128,13 +135,36 @@ model Bid {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  auction    Auction     @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  supplier   Company     @relation(fields: [supplierId], references: [id])
-  awardedBid AwardedBid?
+  auction      Auction      @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  supplier     Company      @relation(fields: [supplierId], references: [id])
+  awardedBid   AwardedBid?
+  bidHistories BidHistory[]
 
   @@unique([auctionId, supplierId])
   @@index([auctionId, amount])
   @@map("bids")
+}
+
+model BidHistory {
+  id             String           @id @default(uuid())
+  auctionId      String           @map("auction_id")
+  supplierId     String           @map("supplier_id")
+  bidId          String?          @map("bid_id")
+  amount         Decimal          @db.Decimal(15, 2)
+  previousAmount Decimal?         @db.Decimal(15, 2) @map("previous_amount")
+  action         BidHistoryAction
+  note           String?
+  ipAddress      String?          @map("ip_address")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  auction  Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  supplier Company @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  bid      Bid?    @relation(fields: [bidId], references: [id], onDelete: SetNull)
+
+  @@index([auctionId, createdAt])
+  @@index([supplierId, createdAt])
+  @@index([auctionId, supplierId, createdAt])
+  @@map("bid_history")
 }
 
 model AwardedBid {
@@ -186,15 +216,19 @@ model EventOutbox {
 }
 
 model SupplierEmbedding {
-  id          String   @id @default(uuid())
-  supplierId  String   @unique @map("supplier_id")
-  auctionId   String   @map("auction_id")
-  context     String   @db.Text // RAG context text (supplier profile, history, etc.)
-  embedding   String   @db.Text // pgvector type stored as JSON array string
-  similarity  Float    @default(0) // Last similarity score (for ranking)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String                  @id @default(uuid())
+  supplierId String                  @map("supplier_id")
+  auctionId  String                  @map("auction_id")
+  context    String                  @db.Text
+  embedding  Unsupported("vector(768)")
+  similarity Float                   @default(0)
+  createdAt  DateTime                @default(now()) @map("created_at")
+  updatedAt  DateTime                @updatedAt @map("updated_at")
 
+  supplier Company @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  auction  Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, auctionId])
   @@index([supplierId])
   @@index([auctionId])
   @@map("supplier_embeddings")

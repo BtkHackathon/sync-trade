@@ -11,6 +11,8 @@ async function main() {
   console.log('🌱 Seed verisi oluşturuluyor...');
 
   await prisma.eventOutbox.deleteMany();
+  await prisma.supplierEmbedding.deleteMany();
+  await prisma.bidHistory.deleteMany();
   await prisma.awardedBid.deleteMany();
   await prisma.bid.deleteMany();
   await prisma.auction.deleteMany();
@@ -67,8 +69,13 @@ async function main() {
       supplierProfile: {
         create: {
           certifications: ['ISO 9001:2015', 'CE Belgesi', 'TSE Standartları'],
-          specializations: ['Ofis Mobilyası', 'Ergonomik Ürünler', 'Toplu Alım'],
-          description: '15 yıllık kurumsal mobilya üretim deneyimi. Yıllık 50.000 adet üretim kapasitesi.',
+          specializations: [
+            'Ofis Mobilyası',
+            'Ergonomik Ürünler',
+            'Toplu Alım',
+          ],
+          description: '15 yıllık kurumsal mobilya üretim deneyimi.',
+          capacity: 'Yıllık 50000 adet ofis mobilyası üretim kapasitesi.',
           reliabilityScore: 8.7,
           totalBids: 47,
           completedAuctions: 43,
@@ -96,7 +103,9 @@ async function main() {
         create: {
           certifications: ['ISO 14001', 'CE Belgesi'],
           specializations: ['Ofis Koltuğu', 'Okul Mobilyası'],
-          description: 'Düşük fiyat odaklı seri üretim. Hızlı teslimat avantajı.',
+          description:
+            'Düşük fiyat odaklı seri üretim. Hızlı teslimat avantajı.',
+          capacity: 'Aylık 8000 adet standart ofis koltuğu.',
           reliabilityScore: 5.2,
           totalBids: 89,
           completedAuctions: 61,
@@ -122,9 +131,20 @@ async function main() {
       isVerified: true,
       supplierProfile: {
         create: {
-          certifications: ['ISO 9001:2015', 'ISO 45001', 'Greenguard Gold', 'CE Belgesi'],
-          specializations: ['Premium Ofis Mobilyası', 'Proje Bazlı Üretim', 'Kurumsal Projeler'],
-          description: 'Kurumsal projeler için premium kalite mobilya çözümleri. 20+ yıl deneyim.',
+          certifications: [
+            'ISO 9001:2015',
+            'ISO 45001',
+            'Greenguard Gold',
+            'CE Belgesi',
+          ],
+          specializations: [
+            'Premium Ofis Mobilyası',
+            'Proje Bazlı Üretim',
+            'Kurumsal Projeler',
+          ],
+          description:
+            'Kurumsal projeler için premium kalite mobilya çözümleri. 20+ yıl deneyim.',
+          capacity: 'Aylık 3000 adet premium proje bazlı üretim.',
           reliabilityScore: 9.1,
           totalBids: 31,
           completedAuctions: 30,
@@ -153,6 +173,7 @@ async function main() {
           certifications: [],
           specializations: ['Her tür mobilya'],
           description: 'En ucuz fiyatlar garantisi.',
+          capacity: 'Kapasite beyan edilmedi.',
           reliabilityScore: 2.3,
           totalBids: 156,
           completedAuctions: 89,
@@ -168,14 +189,20 @@ async function main() {
   const closedAuction = await prisma.auction.create({
     data: {
       title: '500 Adet Ergonomik Ofis Koltuğu Alımı',
-      description: 'Manisa ofisimiz için yüksek sırtlı, bel destekli, kolçaklı ergonomik çalışma koltuğu. Kumaş rengi: Antrasit veya Gri.',
+      description:
+        'Manisa ofisimiz için yüksek sırtlı, bel destekli, kolçaklı ergonomik çalışma koltuğu. Kumaş rengi: Antrasit veya Gri.',
       category: 'Ofis Mobilyası',
       quantity: 500,
       unit: 'adet',
       maxBudget: 1000000,
       deliveryDeadline: new Date('2026-06-15'),
       deliveryAddress: 'Manisa OSB, 45030 Manisa',
-      requirements: ['CE Sertifikası zorunlu', 'Kumaş: Örgü kumaş (mesh)', 'Yükseklik ayarlı', 'Garanti: Min 3 yıl'],
+      requirements: [
+        'CE Sertifikası zorunlu',
+        'Kumaş: Örgü kumaş (mesh)',
+        'Yükseklik ayarlı',
+        'Garanti: Min 3 yıl',
+      ],
       status: 'CLOSED',
       endsAt: new Date(Date.now() - 3600000),
       buyerId: buyer1.id,
@@ -187,14 +214,19 @@ async function main() {
   const openAuction = await prisma.auction.create({
     data: {
       title: '10 Ton A Kalite Penye Pamuk İpliği Alımı',
-      description: 'Bant üretimi için 20/1 ve 30/1 numara, A kalite penye pamuk ipliği.',
+      description:
+        'Bant üretimi için 20/1 ve 30/1 numara, A kalite penye pamuk ipliği.',
       category: 'Tekstil Hammaddesi',
       quantity: 10000,
       unit: 'kg',
       maxBudget: 500000,
       deliveryDeadline: new Date('2026-06-01'),
       deliveryAddress: 'Bursa OSB, Bursa',
-      requirements: ['Karde veya penye', 'OEKO-TEX Standard 100 sertifikalı', 'Nem oranı max %8'],
+      requirements: [
+        'Karde veya penye',
+        'OEKO-TEX Standard 100 sertifikalı',
+        'Nem oranı max %8',
+      ],
       status: 'OPEN',
       endsAt: new Date(Date.now() + 7200000),
       buyerId: buyer2.id,
@@ -251,8 +283,14 @@ async function main() {
   console.log('TEDARİKÇİ →', supplier3.email, '(Premium, 9.1/10)');
   console.log('TEDARİKÇİ →', supplier4.email, '(Riskli, 2.3/10)');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📋 DEMO İHALE (KAPALI — AI analizi için hazır):', closedAuction.id);
-  console.log('📋 DEMO İHALE (AÇIK — canlı teklif için hazır):', openAuction.id);
+  console.log(
+    '📋 DEMO İHALE (KAPALI — AI analizi için hazır):',
+    closedAuction.id,
+  );
+  console.log(
+    '📋 DEMO İHALE (AÇIK — canlı teklif için hazır):',
+    openAuction.id,
+  );
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
