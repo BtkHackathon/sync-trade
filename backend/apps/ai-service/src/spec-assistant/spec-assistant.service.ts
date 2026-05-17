@@ -39,12 +39,15 @@ export class SpecAssistantService {
     }
 
     if (input.file.mimetype === 'application/pdf') {
-      const parser = await import('pdf-parse');
-      const pdfParse = (parser.default ?? parser) as unknown as (
-        buffer: Buffer,
-      ) => Promise<{ text: string }>;
-      const result = await pdfParse(input.file.buffer);
-      return result.text.trim();
+      const { PDFParse } = await import('pdf-parse');
+      const parser = new PDFParse({ data: new Uint8Array(input.file.buffer) });
+
+      try {
+        const result = await parser.getText();
+        return result.text.trim();
+      } finally {
+        await parser.destroy();
+      }
     }
 
     if (input.file.mimetype.startsWith('text/')) {
@@ -81,15 +84,21 @@ export class SpecAssistantService {
 
   private inferCategory(text: string): string {
     const lower = text.toLowerCase();
-    if (/(koltuk|sandalye|masa|mobilya|ofis)/.test(lower)) return 'Ofis Mobilyasi';
+    if (/(koltuk|sandalye|masa|mobilya|ofis)/.test(lower))
+      return 'Ofis Mobilyasi';
     if (/(tekstil|pamu|kumas|forma|tisort)/.test(lower)) return 'Tekstil';
     if (/(gida|restoran|et|sebze|bakliyat)/.test(lower)) return 'Gida';
     if (/(metal|cnc|sac|aluminyum)/.test(lower)) return 'Endustriyel Uretim';
     return 'Genel Tedarik';
   }
 
-  private extractQuantity(text: string): { value: number | null; unit: string | null } {
-    const match = text.match(/(\d+)\s*(adet|ton|kg|kilogram|metre|m2|koli|paket)/i);
+  private extractQuantity(text: string): {
+    value: number | null;
+    unit: string | null;
+  } {
+    const match = text.match(
+      /(\d+)\s*(adet|ton|kg|kilogram|metre|m2|koli|paket)/i,
+    );
     if (!match) {
       return { value: null, unit: null };
     }

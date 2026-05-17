@@ -29,7 +29,9 @@ export class AnalysisController {
 
   @Post('auctions/:auctionId/analyze')
   @Roles(CompanyRole.BUYER)
-  @ApiOperation({ summary: 'Kapali ihale icin AI risk ve kazanan onerisi uret' })
+  @ApiOperation({
+    summary: 'Kapali ihale icin AI risk ve kazanan onerisi uret',
+  })
   @ApiParam({ name: 'auctionId', description: 'Auction ID' })
   analyzeAuction(
     @Param('auctionId', new ParseUUIDPipe({ version: '4' })) auctionId: string,
@@ -40,7 +42,9 @@ export class AnalysisController {
 
   @Post('detect-fraud/:auctionId')
   @Roles(CompanyRole.BUYER)
-  @ApiOperation({ summary: 'Ihale tekliflerinde fraud/kartel riskini analiz et' })
+  @ApiOperation({
+    summary: 'Ihale tekliflerinde fraud/kartel riskini analiz et',
+  })
   @ApiParam({ name: 'auctionId', description: 'Auction ID' })
   detectFraud(
     @Param('auctionId', new ParseUUIDPipe({ version: '4' })) auctionId: string,
@@ -62,9 +66,13 @@ export class AnalysisController {
 
   @Post('analyze-spec')
   @Roles(CompanyRole.BUYER)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Sartname metni/PDF dosyasindan ihale form alanlari cikar' })
+  @ApiOperation({
+    summary: 'Sartname metni/PDF dosyasindan ihale form alanlari cikar',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -83,9 +91,14 @@ export class AnalysisController {
   })
   analyzeSpec(
     @Body() dto: AnalyzeSpecDto,
+    @CurrentCompany() company: JwtPayload,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.analysis.analyzeSpec({ text: dto.text, file });
+    return this.analysis.analyzeSpec({
+      text: dto.text,
+      file,
+      buyerId: company.sub,
+    });
   }
 
   @Get('reports/:auctionId')

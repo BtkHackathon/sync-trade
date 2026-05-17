@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisEvents } from '@app/events';
@@ -67,31 +72,61 @@ export class RedisEventsBridge implements OnModuleInit, OnModuleDestroy {
 
       switch (channel) {
         case RedisEvents.BID_PLACED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'bid-update', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'bid-update',
+            payload,
+          );
           break;
         case RedisEvents.BID_WITHDRAWN:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'bid-withdrawn', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'bid-withdrawn',
+            payload,
+          );
           break;
         case RedisEvents.AUCTION_OPENED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-opened', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'auction-opened',
+            payload,
+          );
           break;
         case RedisEvents.AUCTION_CLOSED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-closed', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'auction-closed',
+            payload,
+          );
           break;
         case RedisEvents.AUCTION_AWARDED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'auction-awarded', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'auction-awarded',
+            payload,
+          );
           break;
         case RedisEvents.AI_ANALYSIS_STARTED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'ai-analysis-started', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'ai-analysis-started',
+            payload,
+          );
           break;
         case RedisEvents.AI_ANALYSIS_COMPLETED:
-          this.auctionGateway.emitAuctionEvent(auctionId, 'ai-analysis-completed', payload);
+          this.auctionGateway.emitAuctionEvent(
+            auctionId,
+            'ai-analysis-completed',
+            payload,
+          );
           break;
         default:
           break;
       }
     } catch (e) {
-      this.logger.warn(`Mesaj çözümlenemedi (${channel}): ${e instanceof Error ? e.message : String(e)}`);
+      this.logger.warn(
+        `Mesaj çözümlenemedi (${channel}): ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
 }

@@ -13,7 +13,9 @@ export class GeminiService {
 
     const apiKey = this.config.get<string>('GEMINI_API_KEY');
     if (!apiKey || apiKey.includes('your-gemini-api-key')) {
-      this.logger.warn('GEMINI_API_KEY missing. AI service will use deterministic fallback output.');
+      this.logger.warn(
+        'GEMINI_API_KEY missing. AI service will use deterministic fallback output.',
+      );
       return;
     }
 

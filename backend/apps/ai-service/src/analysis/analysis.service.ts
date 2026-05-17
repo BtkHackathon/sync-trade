@@ -7,7 +7,17 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { PrismaService, AiReport, AiReportDocument } from '@app/database';
+import {
+  PrismaService,
+  AiReport,
+  AiReportDocument,
+  DocumentParseLog,
+  DocumentParseLogDocument,
+  FraudDetectionLog,
+  FraudDetectionLogDocument,
+  RagQueryLog,
+  RagQueryLogDocument,
+} from '@app/database';
 import { CompanyRole, JwtPayload } from '@app/common';
 import { EventsService, RedisEvents } from '@app/events';
 import { GeminiService } from '../gemini/gemini.service';
@@ -37,6 +47,12 @@ export class AnalysisService {
     private readonly events: EventsService,
     @InjectModel(AiReport.name)
     private readonly reports: Model<AiReportDocument>,
+    @InjectModel(DocumentParseLog.name)
+    private readonly documentParseLogs: Model<DocumentParseLogDocument>,
+    @InjectModel(FraudDetectionLog.name)
+    private readonly fraudDetectionLogs: Model<FraudDetectionLogDocument>,
+    @InjectModel(RagQueryLog.name)
+    private readonly ragQueryLogs: Model<RagQueryLogDocument>,
   ) {}
 
   async analyzeClosedAuction(
@@ -48,7 +64,9 @@ export class AnalysisService {
     return this.createAuctionReport(auction);
   }
 
-  async analyzeClosedAuctionFromEvent(auctionId: string): Promise<StoredAuctionReport> {
+  async analyzeClosedAuctionFromEvent(
+    auctionId: string,
+  ): Promise<StoredAuctionReport> {
     const auction = await this.getAuctionWithBids(auctionId);
     return this.createAuctionReport(auction);
   }
@@ -59,7 +77,22 @@ export class AnalysisService {
   ): Promise<FraudDetectionResult> {
     const auction = await this.getAuctionWithBids(auctionId);
     this.assertBuyerOwnsAuction(auction, viewer);
-    return this.fraud.assessBids(this.toFraudInputs(auction.bids));
+    const result = this.fraud.assessBids(
+      this.toFraudInputs(auction.bids),
+      this.toFraudHistoryInputs(auction.bidHistories ?? []),
+    );
+
+    await this.safeCreateLog('fraud-detection-log', () =>
+      this.fraudDetectionLogs.create({
+        auctionId,
+        buyerId: viewer.sub,
+        bidCount: auction.bids.length,
+        historyCount: auction.bidHistories?.length ?? 0,
+        result: result as unknown as Record<string, unknown>,
+      }),
+    );
+
+    return result;
   }
 
   async analyzeSupplier(
@@ -105,11 +138,29 @@ export class AnalysisService {
     });
   }
 
-  analyzeSpec(input: {
+  async analyzeSpec(input: {
     text?: string;
     file?: Express.Multer.File;
+    buyerId?: string;
   }): Promise<SpecAnalysisResult> {
-    return this.specAssistant.analyze(input);
+    const result = await this.specAssistant.analyze(input);
+
+    await this.safeCreateLog('document-parse-log', () =>
+      this.documentParseLogs.create({
+        buyerId: input.buyerId ?? 'unknown',
+        sourceType: input.file
+          ? input.file.mimetype === 'application/pdf'
+            ? 'PDF'
+            : 'FILE'
+          : 'TEXT',
+        fileName: input.file?.originalname,
+        mimeType: input.file?.mimetype,
+        textLength: input.text?.length ?? input.file?.size ?? 0,
+        extractedFields: result as unknown as Record<string, unknown>,
+      }),
+    );
+
+    return result;
   }
 
   async getReport(
@@ -143,13 +194,19 @@ export class AnalysisService {
     return this.toStoredReport(report);
   }
 
-  private async createAuctionReport(auction: any): Promise<StoredAuctionReport> {
+  private async createAuctionReport(
+    auction: any,
+  ): Promise<StoredAuctionReport> {
     if (!['CLOSED', 'AWARDED'].includes(auction.status)) {
-      throw new BadRequestException('AI report can be created after the auction is closed.');
+      throw new BadRequestException(
+        'AI report can be created after the auction is closed.',
+      );
     }
 
     if (!auction.bids.length) {
-      throw new BadRequestException('AI report requires at least one active bid.');
+      throw new BadRequestException(
+        'AI report requires at least one active bid.',
+      );
     }
 
     const startedAt = Date.now();
@@ -159,41 +216,47 @@ export class AnalysisService {
     });
 
     const rankings = this.buildRankings(auction.bids);
-    const fraudDetection = this.fraud.assessBids(this.toFraudInputs(auction.bids));
-    const ragContextUsed = this.rag.buildSupplierMemory(
-      auction.bids.map((bid) => bid.supplier),
+    const fraudDetection = this.fraud.assessBids(
+      this.toFraudInputs(auction.bids),
+      this.toFraudHistoryInputs(auction.bidHistories ?? []),
     );
-    const fallback = this.buildAuctionFallback(auction, rankings, fraudDetection);
+    const ragContextUsed = await this.buildRagContext(auction);
+    const fallback = this.buildAuctionFallback(
+      auction,
+      rankings,
+      fraudDetection,
+    );
 
-    const analysisResult = await this.gemini.generateJson<AuctionAnalysisResult>({
-      task: 'auction-risk-and-winner-recommendation',
-      fallback,
-      prompt: [
-        'You are an AI risk analyst for a B2B reverse-auction procurement platform.',
-        'Recommend a winner by considering bid amount, reliability, delivery history, certifications and fraud risk.',
-        'Return the exact JSON shape of the fallback object.',
-        '',
-        JSON.stringify(
-          {
-            auction: {
-              id: auction.id,
-              title: auction.title,
-              category: auction.category,
-              quantity: auction.quantity,
-              unit: auction.unit,
-              maxBudget: this.toNumber(auction.maxBudget),
-              status: auction.status,
-              deliveryDeadline: auction.deliveryDeadline,
+    const analysisResult =
+      await this.gemini.generateJson<AuctionAnalysisResult>({
+        task: 'auction-risk-and-winner-recommendation',
+        fallback,
+        prompt: [
+          'You are an AI risk analyst for a B2B reverse-auction procurement platform.',
+          'Recommend a winner by considering bid amount, reliability, delivery history, certifications and fraud risk.',
+          'Return the exact JSON shape of the fallback object.',
+          '',
+          JSON.stringify(
+            {
+              auction: {
+                id: auction.id,
+                title: auction.title,
+                category: auction.category,
+                quantity: auction.quantity,
+                unit: auction.unit,
+                maxBudget: this.toNumber(auction.maxBudget),
+                status: auction.status,
+                deliveryDeadline: auction.deliveryDeadline,
+              },
+              bids: auction.bids,
+              ragContextUsed,
+              fallback,
             },
-            bids: auction.bids,
-            ragContextUsed,
-            fallback,
-          },
-          null,
-          2,
-        ),
-      ].join('\n'),
-    });
+            null,
+            2,
+          ),
+        ].join('\n'),
+      });
 
     const processingTimeMs = Date.now() - startedAt;
     const saved = await this.reports
@@ -221,14 +284,67 @@ export class AnalysisService {
       auctionId: auction.id,
       reportId: report.reportId,
       recommendedSupplierId: report.analysisResult.recommendedBid.supplierId,
-      recommendedSupplierName: report.analysisResult.recommendedBid.supplierName,
+      recommendedSupplierName:
+        report.analysisResult.recommendedBid.supplierName,
       finalRecommendation: report.analysisResult.finalRecommendation,
     });
 
     return report;
   }
 
-  private async safePublish(event: RedisEvents, payload: Record<string, unknown>): Promise<void> {
+  private async buildRagContext(auction: any): Promise<string[]> {
+    const suppliers = auction.bids.map((bid: any) => bid.supplier);
+    const baseContext = this.rag.buildSupplierMemory(suppliers);
+
+    await Promise.all(
+      auction.bids.map((bid: any, index: number) =>
+        this.rag.upsertSupplierMemory({
+          supplier: bid.supplier,
+          auctionId: auction.id,
+          context: baseContext[index],
+        }),
+      ),
+    );
+
+    const query = `${auction.title} ${auction.category} ${auction.description}`;
+    const supplierIds = auction.bids.map((bid: any) => bid.supplierId);
+    const vectorContext = await this.rag.findRelevantSupplierMemories({
+      query,
+      supplierIds,
+      limit: 8,
+    });
+    const context = vectorContext.length > 0 ? vectorContext : baseContext;
+
+    await this.safeCreateLog('rag-query-log', () =>
+      this.ragQueryLogs.create({
+        auctionId: auction.id,
+        query,
+        supplierIds,
+        resultCount: context.length,
+        context,
+      }),
+    );
+
+    return context;
+  }
+  private async safeCreateLog(
+    label: string,
+    writer: () => Promise<unknown>,
+  ): Promise<void> {
+    try {
+      await writer();
+    } catch (error) {
+      this.logger.warn(
+        `Could not persist ${label}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+  private async safePublish(
+    event: RedisEvents,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
     try {
       await this.events.publish(event, payload);
     } catch (error) {
@@ -260,6 +376,10 @@ export class AnalysisService {
             },
           },
         },
+        bidHistories: {
+          orderBy: { createdAt: 'asc' },
+          take: 200,
+        },
       },
     });
 
@@ -272,7 +392,9 @@ export class AnalysisService {
 
   private assertBuyerOwnsAuction(auction: any, viewer: JwtPayload): void {
     if (viewer.role !== CompanyRole.BUYER || auction.buyerId !== viewer.sub) {
-      throw new ForbiddenException('Only the auction owner buyer can run this analysis.');
+      throw new ForbiddenException(
+        'Only the auction owner buyer can run this analysis.',
+      );
     }
   }
 
@@ -287,7 +409,8 @@ export class AnalysisService {
         const onTime = profile?.onTimeDeliveryRate ?? 0;
         const completed = profile?.completedAuctions ?? 0;
         const cancelled = profile?.cancelledAuctions ?? 0;
-        const certificationBonus = Math.min(profile?.certifications?.length ?? 0, 4) * 1.5;
+        const certificationBonus =
+          Math.min(profile?.certifications?.length ?? 0, 4) * 1.5;
         const priceScore = (lowest / amount) * 42;
         const reliabilityScore = reliability * 4;
         const deliveryScore = onTime * 14;
@@ -298,7 +421,12 @@ export class AnalysisService {
             0,
             Math.min(
               100,
-              priceScore + reliabilityScore + deliveryScore + experienceScore + certificationBonus - penalty,
+              priceScore +
+                reliabilityScore +
+                deliveryScore +
+                experienceScore +
+                certificationBonus -
+                penalty,
             ),
           ),
         );
@@ -338,7 +466,8 @@ export class AnalysisService {
         supplierId: recommended.supplierId,
         supplierName: recommended.supplierName,
         amount: recommended.bidAmount,
-        reason: 'Recommendation balances price, reliability, delivery history and fraud risk.',
+        reason:
+          'Recommendation balances price, reliability, delivery history and fraud risk.',
       },
       supplierRankings: rankings,
       fraudDetection,
@@ -355,7 +484,16 @@ export class AnalysisService {
     const cancelled = profile?.cancelledAuctions ?? 0;
     const onTime = profile?.onTimeDeliveryRate ?? 0;
     const trustScore = this.round(
-      Math.max(0, Math.min(100, reliability * 7 + onTime * 20 + Math.min(completed, 30) - cancelled * 5)),
+      Math.max(
+        0,
+        Math.min(
+          100,
+          reliability * 7 +
+            onTime * 20 +
+            Math.min(completed, 30) -
+            cancelled * 5,
+        ),
+      ),
     );
 
     return {
@@ -382,14 +520,33 @@ export class AnalysisService {
     }));
   }
 
+  private toFraudHistoryInputs(histories: any[]) {
+    return histories.map((history) => ({
+      supplierId: history.supplierId,
+      amount: this.toNumber(history.amount),
+      previousAmount:
+        history.previousAmount === null || history.previousAmount === undefined
+          ? null
+          : this.toNumber(history.previousAmount),
+      action: history.action,
+      ipAddress: history.ipAddress ?? null,
+      createdAt: history.createdAt,
+    }));
+  }
   private buildStrengths(profile: any, isLowest: boolean): string[] {
     const strengths: string[] = [];
     if (isLowest) strengths.push('Lowest price in the auction');
-    if ((profile?.reliabilityScore ?? 0) >= 8) strengths.push('High reliability score');
-    if ((profile?.onTimeDeliveryRate ?? 0) >= 0.9) strengths.push('Strong on-time delivery rate');
-    if ((profile?.certifications?.length ?? 0) > 0) strengths.push('Relevant certifications');
-    if ((profile?.completedAuctions ?? 0) >= 10) strengths.push('Proven similar auction history');
-    return strengths.length ? strengths : ['Basic supplier profile is complete'];
+    if ((profile?.reliabilityScore ?? 0) >= 8)
+      strengths.push('High reliability score');
+    if ((profile?.onTimeDeliveryRate ?? 0) >= 0.9)
+      strengths.push('Strong on-time delivery rate');
+    if ((profile?.certifications?.length ?? 0) > 0)
+      strengths.push('Relevant certifications');
+    if ((profile?.completedAuctions ?? 0) >= 10)
+      strengths.push('Proven similar auction history');
+    return strengths.length
+      ? strengths
+      : ['Basic supplier profile is complete'];
   }
 
   private buildRisks(profile: any, amount: number, lowest: number): string[] {
@@ -400,16 +557,25 @@ export class AnalysisService {
     if ((profile?.cancelledAuctions ?? 0) > 2) {
       risks.push('Cancelled auction history requires review');
     }
-    if ((profile?.onTimeDeliveryRate ?? 0) > 0 && profile.onTimeDeliveryRate < 0.7) {
+    if (
+      (profile?.onTimeDeliveryRate ?? 0) > 0 &&
+      profile.onTimeDeliveryRate < 0.7
+    ) {
       risks.push('Delivery punctuality risk');
     }
     if (amount > 0 && lowest > 0 && amount > lowest * 1.12) {
       risks.push('Price is materially above the lowest bid');
     }
-    return risks.length ? risks : ['No major risk signal in available platform data'];
+    return risks.length
+      ? risks
+      : ['No major risk signal in available platform data'];
   }
 
-  private toRiskLevel(score: number, reliability: number, cancelled: number): 'LOW' | 'MEDIUM' | 'HIGH' {
+  private toRiskLevel(
+    score: number,
+    reliability: number,
+    cancelled: number,
+  ): 'LOW' | 'MEDIUM' | 'HIGH' {
     if (score >= 78 && reliability >= 7 && cancelled <= 2) return 'LOW';
     if (score < 45 || cancelled >= 5) return 'HIGH';
     return 'MEDIUM';

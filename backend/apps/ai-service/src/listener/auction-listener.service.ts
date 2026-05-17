@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { RedisEvents } from '@app/events';
@@ -45,7 +50,9 @@ export class AuctionListenerService implements OnModuleInit, OnModuleDestroy {
 
   private async handleClosedAuction(message: string): Promise<void> {
     try {
-      const envelope = JSON.parse(message) as { payload?: { auctionId?: string } };
+      const envelope = JSON.parse(message) as {
+        payload?: { auctionId?: string };
+      };
       const auctionId = envelope.payload?.auctionId;
       if (!auctionId) {
         return;

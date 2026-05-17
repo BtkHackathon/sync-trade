@@ -72,6 +72,14 @@ export interface SpecAnalysisResult {
   technicalSpecs: Record<string, string | number | boolean | null>;
 }
 
+export interface BidHistoryForFraud {
+  supplierId: string;
+  amount: number;
+  previousAmount: number | null;
+  action: 'PLACED' | 'UPDATED' | 'WITHDRAWN';
+  ipAddress: string | null;
+  createdAt: Date;
+}
 export interface BidForFraud {
   supplierId: string;
   supplierName: string;
