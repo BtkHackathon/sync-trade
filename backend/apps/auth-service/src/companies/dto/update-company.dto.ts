@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateCompanyDto {
   @ApiPropertyOptional({ example: 'Ergosan Mobilya Üretim A.Ş.' })

@@ -8,8 +8,8 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 /**
- * Auth Service'e özel JWT stratejisi: her istekte DB'yi kontrol eder (stateful).
- * Diğer servisler libs/common'daki stateless JwtStrategy'yi kullanır.
+ * Auth Service uses a stateful JWT strategy that checks the company in PostgreSQL.
+ * Other services use the shared stateless strategy from libs/common.
  */
 @Module({
   imports: [
@@ -20,7 +20,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET'),
+        secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: config.get<string>('JWT_EXPIRES_IN', '7d') as any,
         },

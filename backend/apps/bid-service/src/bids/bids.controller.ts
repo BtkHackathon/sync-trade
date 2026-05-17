@@ -8,7 +8,12 @@ import {
   Post,
   Req,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { Request } from 'express';
 import { CompanyRole, CurrentCompany, JwtPayload, Roles } from '@app/common';
 import { BidsService } from './bids.service';
@@ -30,14 +35,18 @@ export class BidsController {
   ) {
     const forwarded = req.headers['x-forwarded-for'];
     const ipFromForwarded =
-      typeof forwarded === 'string' ? forwarded.split(',')[0]?.trim() : undefined;
+      typeof forwarded === 'string'
+        ? forwarded.split(',')[0]?.trim()
+        : undefined;
     const ip = ipFromForwarded ?? req.ip ?? null;
     return this.bids.placeBid(company.sub, dto, ip);
   }
 
   @Get('auction/:auctionId')
   @Roles(CompanyRole.BUYER)
-  @ApiOperation({ summary: 'İhalenin aktif teklifleri (yalnızca ihale sahibi)' })
+  @ApiOperation({
+    summary: 'İhalenin aktif teklifleri (yalnızca ihale sahibi)',
+  })
   @ApiParam({ name: 'auctionId', description: 'İhale ID' })
   listForAuction(
     @Param('auctionId', new ParseUUIDPipe({ version: '4' })) auctionId: string,

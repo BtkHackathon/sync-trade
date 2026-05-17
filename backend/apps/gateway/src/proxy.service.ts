@@ -35,14 +35,21 @@ export class ProxyService {
       for (const [name, value] of Object.entries(upstream.headers)) {
         if (value === undefined) continue;
         const lower = name.toLowerCase();
-        if (['transfer-encoding', 'connection', 'content-encoding'].includes(lower)) {
+        if (
+          ['transfer-encoding', 'connection', 'content-encoding'].includes(
+            lower,
+          )
+        ) {
           continue;
         }
         res.setHeader(name, value as string | string[]);
       }
       res.send(upstream.data);
     } catch (err) {
-      this.logger.error(`Upstream ${key} hata: ${targetUrl}`, err instanceof Error ? err.stack : String(err));
+      this.logger.error(
+        `Upstream ${key} hata: ${targetUrl}`,
+        err instanceof Error ? err.stack : String(err),
+      );
       if (!res.headersSent) {
         res.status(502).json({
           message: 'Upstream servise ulaşılamadı.',
@@ -70,7 +77,13 @@ export class ProxyService {
 
   private forwardHeaders(req: Request): Record<string, string> {
     const out: Record<string, string> = {};
-    const allow = ['authorization', 'content-type', 'accept', 'accept-language', 'x-request-id'];
+    const allow = [
+      'authorization',
+      'content-type',
+      'accept',
+      'accept-language',
+      'x-request-id',
+    ];
     for (const key of allow) {
       const v = req.headers[key];
       if (typeof v === 'string' && v.length > 0) {
@@ -79,7 +92,9 @@ export class ProxyService {
     }
 
     const clientIp =
-      (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim() ??
+      (req.headers['x-forwarded-for'] as string | undefined)
+        ?.split(',')[0]
+        ?.trim() ??
       req.socket.remoteAddress ??
       '';
     if (clientIp) {

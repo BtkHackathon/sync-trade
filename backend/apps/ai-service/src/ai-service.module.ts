@@ -1,17 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CommonModule, JwtStrategy } from '@app/common';
 import { AnalysisModule } from './analysis/analysis.module';
-
-// TODO: DatabaseModule ekle
-// TODO: CommonModule ekle (JwtStrategy, guards için)
-// TODO: MongooseModule.forRootAsync() ekle (MONGODB_URI env)
-// TODO: AuctionListenerService provider ekle (Redis listener)
-// TODO: MulterModule ekle (dosya yükleme için)
+import { AuctionListenerService } from './listener/auction-listener.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
+    CommonModule,
     AnalysisModule,
   ],
+  providers: [JwtStrategy, AuctionListenerService],
 })
 export class AiServiceModule {}

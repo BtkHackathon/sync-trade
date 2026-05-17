@@ -26,3 +26,6 @@ export * from './filters/all-exceptions.filter';
 
 // Interceptors
 export * from './interceptors/response.interceptor';
+
+// Config
+export * from './config/cors-options';

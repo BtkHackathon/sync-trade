@@ -13,7 +13,10 @@ export class PlaceBidDto {
   @IsUUID('4')
   auctionId: string;
 
-  @ApiProperty({ example: 95000.5, description: 'Tersine ihale: mevcut en iyi tekliften dusuk olmali' })
+  @ApiProperty({
+    example: 95000.5,
+    description: 'Tersine ihale: mevcut en iyi tekliften dusuk olmali',
+  })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   amount: number;

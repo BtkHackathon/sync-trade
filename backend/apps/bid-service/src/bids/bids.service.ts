@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import {
   AuctionStatus,
+  BidHistoryAction,
   BidStatus,
   CompanyRole,
   Prisma,
@@ -47,7 +48,11 @@ export class BidsService {
     private readonly locks: BidLockService,
   ) {}
 
-  async placeBid(supplierId: string, dto: PlaceBidDto, ipAddress?: string | null) {
+  async placeBid(
+    supplierId: string,
+    dto: PlaceBidDto,
+    ipAddress?: string | null,
+  ) {
     await this.assertVerifiedSupplier(supplierId);
     const amount = new Prisma.Decimal(dto.amount);
 
@@ -57,7 +62,7 @@ export class BidsService {
     } catch (e) {
       if (e instanceof Error && e.message === 'LOCK_NOT_ACQUIRED') {
         throw new ConflictException(
-          'Bu ihaleye şu anda çok sayıda teklif geliyor. Lütfen birkaç saniye sonra tekrar deneyin.',
+          'Bu ihaleye su anda cok sayida teklif geliyor. Lutfen birkac saniye sonra tekrar deneyin.',
         );
       }
       throw e;
@@ -83,19 +88,25 @@ export class BidsService {
           });
 
           if (!auction) {
-            throw new NotFoundException('İhale bulunamadı.');
+            throw new NotFoundException('Ihale bulunamadi.');
           }
 
           if (auction.status !== AuctionStatus.OPEN) {
-            throw new BadRequestException('Sadece açık ihalelere teklif verilebilir.');
+            throw new BadRequestException(
+              'Sadece acik ihalelere teklif verilebilir.',
+            );
           }
 
           if (auction.endsAt <= new Date()) {
-            throw new BadRequestException('İhale süresi doldu, teklif kabul edilmiyor.');
+            throw new BadRequestException(
+              'Ihale suresi doldu, teklif kabul edilmiyor.',
+            );
           }
 
           if (auction.buyerId === supplierId) {
-            throw new ForbiddenException('İhale sahibi kendi ihalesine teklif veremez.');
+            throw new ForbiddenException(
+              'Ihale sahibi kendi ihalesine teklif veremez.',
+            );
           }
 
           const prevLow = auction.lowestBidAmount;
@@ -115,7 +126,7 @@ export class BidsService {
           });
 
           if (!supplier) {
-            throw new NotFoundException('Tedarikçi bulunamadı.');
+            throw new NotFoundException('Tedarikci bulunamadi.');
           }
 
           const existing = await tx.bid.findUnique({
@@ -127,9 +138,19 @@ export class BidsService {
             },
           });
 
-          if (existing?.status === BidStatus.ACTIVE && existing.amount.equals(amount)) {
-            throw new BadRequestException('Aynı tutarda tekrar teklif verilemez.');
+          if (
+            existing?.status === BidStatus.ACTIVE &&
+            existing.amount.equals(amount)
+          ) {
+            throw new BadRequestException(
+              'Ayni tutarda tekrar teklif verilemez.',
+            );
           }
+
+          const previousAmount = existing?.amount ?? null;
+          const historyAction = existing
+            ? BidHistoryAction.UPDATED
+            : BidHistoryAction.PLACED;
 
           const bid = await tx.bid.upsert({
             where: {
@@ -155,6 +176,19 @@ export class BidsService {
             include: this.bidListInclude,
           });
 
+          await tx.bidHistory.create({
+            data: {
+              auctionId: dto.auctionId,
+              supplierId,
+              bidId: bid.id,
+              amount,
+              previousAmount,
+              action: historyAction,
+              note: dto.note,
+              ipAddress: ipAddress ?? undefined,
+            },
+          });
+
           const stats = await tx.bid.aggregate({
             where: { auctionId: dto.auctionId, status: BidStatus.ACTIVE },
             _min: { amount: true },
@@ -163,7 +197,9 @@ export class BidsService {
 
           const newLowest = stats._min.amount;
           if (!newLowest) {
-            throw new BadRequestException('Teklif istatistikleri hesaplanamadı.');
+            throw new BadRequestException(
+              'Teklif istatistikleri hesaplanamadi.',
+            );
           }
 
           await tx.auction.update({
@@ -211,11 +247,13 @@ export class BidsService {
     });
 
     if (!auction) {
-      throw new NotFoundException('İhale bulunamadı.');
+      throw new NotFoundException('Ihale bulunamadi.');
     }
 
     if (auction.buyerId !== viewer.sub) {
-      throw new ForbiddenException('Bu ihalenin tekliflerini sadece ihale sahibi görebilir.');
+      throw new ForbiddenException(
+        'Bu ihalenin tekliflerini sadece ihale sahibi gorebilir.',
+      );
     }
 
     return this.prisma.bid.findMany({
@@ -252,24 +290,29 @@ export class BidsService {
         auctionId: true,
         supplierId: true,
         status: true,
+        amount: true,
+        note: true,
+        ipAddress: true,
         auction: { select: { status: true } },
       },
     });
 
     if (!bid) {
-      throw new NotFoundException('Teklif bulunamadı.');
+      throw new NotFoundException('Teklif bulunamadi.');
     }
 
     if (bid.supplierId !== supplierId) {
-      throw new ForbiddenException('Bu teklif size ait değil.');
+      throw new ForbiddenException('Bu teklif size ait degil.');
     }
 
     if (bid.status !== BidStatus.ACTIVE) {
-      throw new BadRequestException('Sadece aktif teklifler geri çekilebilir.');
+      throw new BadRequestException('Sadece aktif teklifler geri cekilebilir.');
     }
 
     if (bid.auction.status !== AuctionStatus.OPEN) {
-      throw new BadRequestException('İhale açık değilken teklif geri çekilemez.');
+      throw new BadRequestException(
+        'Ihale acik degilken teklif geri cekilemez.',
+      );
     }
 
     let lock: BidLockHandle | undefined;
@@ -278,75 +321,88 @@ export class BidsService {
     } catch (e) {
       if (e instanceof Error && e.message === 'LOCK_NOT_ACQUIRED') {
         throw new ConflictException(
-          'Bu ihaleye şu anda çok sayıda işlem yapılıyor. Lütfen tekrar deneyin.',
+          'Bu ihaleye su anda cok sayida islem yapiliyor. Lutfen tekrar deneyin.',
         );
       }
       throw e;
     }
 
     try {
-      const { outboxId } = await this.prisma.$transaction(
-        async (tx) => {
-          await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM auctions WHERE id = ${bid.auctionId} FOR UPDATE`,
+      const { outboxId } = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM auctions WHERE id = ${bid.auctionId} FOR UPDATE`,
+        );
+
+        const fresh = await tx.bid.findFirst({
+          where: {
+            id: bidId,
+            supplierId,
+            status: BidStatus.ACTIVE,
+            auction: { status: AuctionStatus.OPEN },
+          },
+          select: { id: true, auctionId: true },
+        });
+
+        if (!fresh) {
+          throw new BadRequestException(
+            'Teklif geri cekilemedi (durum degisti).',
           );
+        }
 
-          const fresh = await tx.bid.findFirst({
-            where: {
-              id: bidId,
-              supplierId,
-              status: BidStatus.ACTIVE,
-              auction: { status: AuctionStatus.OPEN },
-            },
-            select: { id: true, auctionId: true },
-          });
+        await tx.bid.update({
+          where: { id: bidId },
+          data: { status: BidStatus.WITHDRAWN },
+        });
 
-          if (!fresh) {
-            throw new BadRequestException('Teklif geri çekilemedi (durum değişti).');
-          }
+        await tx.bidHistory.create({
+          data: {
+            auctionId: bid.auctionId,
+            supplierId,
+            bidId,
+            amount: bid.amount,
+            previousAmount: bid.amount,
+            action: BidHistoryAction.WITHDRAWN,
+            note: bid.note,
+            ipAddress: bid.ipAddress ?? undefined,
+          },
+        });
 
-          await tx.bid.update({
-            where: { id: bidId },
-            data: { status: BidStatus.WITHDRAWN },
-          });
+        const stats = await tx.bid.aggregate({
+          where: { auctionId: bid.auctionId, status: BidStatus.ACTIVE },
+          _min: { amount: true },
+          _count: { _all: true },
+        });
 
-          const stats = await tx.bid.aggregate({
-            where: { auctionId: bid.auctionId, status: BidStatus.ACTIVE },
-            _min: { amount: true },
-            _count: { _all: true },
-          });
+        const newLowest = stats._min.amount;
+        await tx.auction.update({
+          where: { id: bid.auctionId },
+          data: {
+            lowestBidAmount: newLowest ?? null,
+            bidCount: stats._count._all,
+          },
+        });
 
-          const newLowest = stats._min.amount;
-          await tx.auction.update({
-            where: { id: bid.auctionId },
-            data: {
-              lowestBidAmount: newLowest ?? null,
-              bidCount: stats._count._all,
-            },
-          });
+        const supplier = await tx.company.findUnique({
+          where: { id: supplierId },
+          select: { name: true },
+        });
 
-          const supplier = await tx.company.findUnique({
-            where: { id: supplierId },
-            select: { name: true },
-          });
+        const outboxRecord = await this.outbox.enqueue(
+          tx,
+          RedisEvents.BID_WITHDRAWN,
+          {
+            bidId,
+            auctionId: bid.auctionId,
+            supplierId,
+            supplierName: supplier?.name ?? '',
+            withdrawnAt: new Date().toISOString(),
+            lowestBidAmount: newLowest === null ? null : Number(newLowest),
+            activeBidCount: stats._count._all,
+          } satisfies BidWithdrawnEvent,
+        );
 
-          const outboxRecord = await this.outbox.enqueue(
-            tx,
-            RedisEvents.BID_WITHDRAWN,
-            {
-              bidId,
-              auctionId: bid.auctionId,
-              supplierId,
-              supplierName: supplier?.name ?? '',
-              withdrawnAt: new Date().toISOString(),
-              lowestBidAmount: newLowest === null ? null : Number(newLowest),
-              activeBidCount: stats._count._all,
-            } satisfies BidWithdrawnEvent,
-          );
-
-          return { outboxId: outboxRecord.id };
-        },
-      );
+        return { outboxId: outboxRecord.id };
+      });
 
       await this.outbox.publishOne(outboxId);
     } finally {
@@ -362,11 +418,11 @@ export class BidsService {
     globalMinActive: Prisma.Decimal | null,
   ) {
     if (amount.lte(0)) {
-      throw new BadRequestException('Teklif tutarı sıfırdan büyük olmalıdır.');
+      throw new BadRequestException('Teklif tutari sifirdan buyuk olmalidir.');
     }
 
     if (amount.gt(maxBudget)) {
-      throw new BadRequestException('Teklif, ihale maksimum bütçesini aşamaz.');
+      throw new BadRequestException('Teklif, ihale maksimum butcesini asamaz.');
     }
 
     if (globalMinActive === null) {
@@ -375,7 +431,7 @@ export class BidsService {
 
     if (!amount.lt(globalMinActive)) {
       throw new BadRequestException(
-        'Tersine ihalede yeni teklif, mevcut en iyi (en düşük) aktif tekliften düşük olmalıdır.',
+        'Tersine ihalede yeni teklif, mevcut en iyi (en dusuk) aktif tekliften dusuk olmalidir.',
       );
     }
   }
@@ -412,15 +468,19 @@ export class BidsService {
     });
 
     if (!company) {
-      throw new NotFoundException('Şirket bulunamadı.');
+      throw new NotFoundException('Sirket bulunamadi.');
     }
 
     if (company.role !== CompanyRole.SUPPLIER) {
-      throw new ForbiddenException('Sadece tedarikçi firmalar teklif verebilir.');
+      throw new ForbiddenException(
+        'Sadece tedarikci firmalar teklif verebilir.',
+      );
     }
 
     if (!company.isVerified) {
-      throw new ForbiddenException('Firma doğrulaması tamamlanmadan teklif verilemez.');
+      throw new ForbiddenException(
+        'Firma dogrulamasi tamamlanmadan teklif verilemez.',
+      );
     }
   }
 }

@@ -46,11 +46,9 @@ describe('EventOutboxService', () => {
   it('enqueues an event without publishing inside the transaction', async () => {
     prisma.eventOutbox.create.mockResolvedValue({ id: 'outbox-1' });
 
-    const result = await service.enqueue(
-      prisma,
-      RedisEvents.AUCTION_OPENED,
-      { auctionId: 'auction-1' },
-    );
+    const result = await service.enqueue(prisma, RedisEvents.AUCTION_OPENED, {
+      auctionId: 'auction-1',
+    });
 
     expect(result).toEqual({ id: 'outbox-1' });
     expect(prisma.eventOutbox.create).toHaveBeenCalledWith({
@@ -75,10 +73,9 @@ describe('EventOutboxService', () => {
 
     await expect(service.publishOne('outbox-1')).resolves.toBe(true);
 
-    expect(events.publish).toHaveBeenCalledWith(
-      RedisEvents.AUCTION_CLOSED,
-      { auctionId: 'auction-1' },
-    );
+    expect(events.publish).toHaveBeenCalledWith(RedisEvents.AUCTION_CLOSED, {
+      auctionId: 'auction-1',
+    });
     expect(prisma.eventOutbox.update).toHaveBeenCalledWith({
       where: { id: 'outbox-1' },
       data: expect.objectContaining({

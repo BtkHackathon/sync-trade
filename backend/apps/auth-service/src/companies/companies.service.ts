@@ -33,7 +33,10 @@ export class CompaniesService {
     return rest;
   }
 
-  async updateSupplierProfile(companyId: string, dto: UpdateSupplierProfileDto) {
+  async updateSupplierProfile(
+    companyId: string,
+    dto: UpdateSupplierProfileDto,
+  ) {
     const profile = await this.prisma.supplierProfile.findUnique({
       where: { companyId },
     });
@@ -61,6 +64,7 @@ export class CompaniesService {
               reliabilityScore: true,
               certifications: true,
               specializations: true,
+              capacity: true,
               completedAuctions: true,
               onTimeDeliveryRate: true,
             },
