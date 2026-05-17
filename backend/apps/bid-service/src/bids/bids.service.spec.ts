@@ -30,6 +30,9 @@ describe('BidsService', () => {
       company: {
         findUnique: jest.fn(),
       },
+      bidHistory: {
+        create: jest.fn(),
+      },
     };
 
     outbox = {
@@ -38,7 +41,9 @@ describe('BidsService', () => {
     };
 
     locks = {
-      acquire: jest.fn().mockResolvedValue({ key: 'bid:lock:auction-1', token: 't' }),
+      acquire: jest
+        .fn()
+        .mockResolvedValue({ key: 'bid:lock:auction-1', token: 't' }),
       release: jest.fn().mockResolvedValue(undefined),
     };
 
@@ -94,7 +99,9 @@ describe('BidsService', () => {
         _min: { amount: new Prisma.Decimal(95_000) },
         _count: { _all: 2 },
       });
-    prisma.company.findUnique.mockResolvedValueOnce({ name: 'Guvenilir Tedarik A.S.' });
+    prisma.company.findUnique.mockResolvedValueOnce({
+      name: 'Guvenilir Tedarik A.S.',
+    });
     prisma.bid.findUnique.mockResolvedValue(null);
     prisma.bid.upsert.mockResolvedValue({
       id: 'bid-1',

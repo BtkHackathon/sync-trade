@@ -1,5 +1,10 @@
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CompaniesService } from './companies.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { UpdateSupplierProfileDto } from './dto/update-supplier-profile.dto';
@@ -15,10 +20,7 @@ export class CompaniesController {
   @ApiOperation({ summary: 'Tüm tedarikçileri listele' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  getSuppliers(
-    @Query('page') page = 1,
-    @Query('limit') limit = 20,
-  ) {
+  getSuppliers(@Query('page') page = 1, @Query('limit') limit = 20) {
     return this.companiesService.getSuppliers(+page, +limit);
   }
 
@@ -52,7 +54,9 @@ export class CompaniesController {
 
   @Patch('me/supplier-profile')
   @Roles(CompanyRole.SUPPLIER)
-  @ApiOperation({ summary: 'Tedarikçi profilini güncelle (sertifikalar, uzmanlıklar)' })
+  @ApiOperation({
+    summary: 'Tedarikçi profilini güncelle (sertifikalar, uzmanlıklar)',
+  })
   updateSupplierProfile(
     @CurrentCompany() company: JwtPayload,
     @Body() dto: UpdateSupplierProfileDto,

@@ -72,7 +72,9 @@ export class CreateAuctionDto {
   @IsString({ each: true })
   requirements?: string[];
 
-  @ApiPropertyOptional({ example: 'https://cdn.synctrade.dev/specs/ofis-koltugu.pdf' })
+  @ApiPropertyOptional({
+    example: 'https://cdn.synctrade.dev/specs/ofis-koltugu.pdf',
+  })
   @IsOptional()
   @IsString()
   specDocumentUrl?: string;

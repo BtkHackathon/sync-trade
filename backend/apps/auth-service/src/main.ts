@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { buildCorsOptions } from '@app/common';
 import { AuthServiceModule } from './auth-service.module';
 
 async function bootstrap() {
@@ -10,7 +11,7 @@ async function bootstrap() {
   const logger = new Logger('AuthService');
 
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors(buildCorsOptions(config));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -40,4 +41,4 @@ async function bootstrap() {
   logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
-bootstrap();
+void bootstrap();
