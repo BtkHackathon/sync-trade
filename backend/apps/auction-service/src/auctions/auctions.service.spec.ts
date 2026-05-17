@@ -19,7 +19,9 @@ describe('AuctionsService', () => {
     quantity: 500,
     unit: 'adet',
     maxBudget: 1000000,
-    deliveryDeadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+    deliveryDeadline: new Date(
+      Date.now() + 20 * 24 * 60 * 60 * 1000,
+    ).toISOString(),
     endsAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     deliveryAddress: 'Manisa OSB',
     requirements: ['CE sertifikasi zorunlu'],
@@ -99,9 +101,7 @@ describe('AuctionsService', () => {
       ],
     };
 
-    prisma.auction.findUnique
-      .mockResolvedValueOnce(publicAuction)
-      .mockResolvedValueOnce(ownerAuction);
+    prisma.auction.findUnique.mockResolvedValue(ownerAuction);
 
     const result = await service.findOne('auction-1', {
       sub: 'buyer-1',
@@ -135,7 +135,7 @@ describe('AuctionsService', () => {
       role: CompanyRole.SUPPLIER,
     } as JwtPayload);
 
-    expect(result.bids).toEqual([
+    expect((result as any).bids).toEqual([
       expect.objectContaining({
         id: 'bid-own',
         supplierId: 'supplier-1',

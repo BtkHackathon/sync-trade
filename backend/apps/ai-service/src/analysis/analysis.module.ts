@@ -1,13 +1,23 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule, MongoDbModule } from '@app/database';
+import { EventsModule } from '@app/events';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
-
-// TODO: GeminiService, FraudService, SpecAssistantService, RagService provider ekle
-// TODO: MongoDB modülü (Mongoose) ekle (raporlar için)
-// TODO: DatabaseModule (PrismaService, supplier verileri için)
+import { GeminiService } from '../gemini/gemini.service';
+import { FraudService } from '../fraud/fraud.service';
+import { RagService } from '../rag/rag.service';
+import { SpecAssistantService } from '../spec-assistant/spec-assistant.service';
 
 @Module({
+  imports: [DatabaseModule, MongoDbModule, EventsModule],
   controllers: [AnalysisController],
-  providers: [AnalysisService],
+  providers: [
+    AnalysisService,
+    GeminiService,
+    FraudService,
+    RagService,
+    SpecAssistantService,
+  ],
+  exports: [AnalysisService],
 })
 export class AnalysisModule {}

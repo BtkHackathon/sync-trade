@@ -1,14 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AiServiceModule } from './../src/ai-service.module';
+import { AnalysisController } from '../src/analysis/analysis.controller';
+import { AnalysisService } from '../src/analysis/analysis.service';
 
-describe('AiServiceModule (e2e)', () => {
-  it('derlenir ve temiz kapanir', async () => {
+describe('AiService HTTP contract', () => {
+  it('wires the analysis controller without external databases', async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [AiServiceModule],
+      controllers: [AnalysisController],
+      providers: [
+        {
+          provide: AnalysisService,
+          useValue: {
+            analyzeClosedAuction: jest.fn(),
+            detectFraud: jest.fn(),
+            analyzeSupplier: jest.fn(),
+            analyzeSpec: jest.fn(),
+            getReport: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     try {
-      expect(moduleRef).toBeDefined();
+      expect(moduleRef.get(AnalysisController)).toBeDefined();
     } finally {
       await moduleRef.close();
     }

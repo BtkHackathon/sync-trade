@@ -10,10 +10,7 @@ export class EventsService implements OnModuleDestroy {
 
   constructor(private readonly config: ConfigService) {}
 
-  async publish<T>(
-    event: RedisEvents,
-    payload: T,
-  ): Promise<void> {
+  async publish<T>(event: RedisEvents, payload: T): Promise<void> {
     const message = JSON.stringify({
       event,
       payload,

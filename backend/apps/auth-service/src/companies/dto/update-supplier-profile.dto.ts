@@ -20,8 +20,14 @@ export class UpdateSupplierProfileDto {
   @IsString({ each: true })
   specializations?: string[];
 
-  @ApiPropertyOptional({ example: '15 yıllık kurumsal mobilya üretim deneyimi.' })
+  @ApiPropertyOptional({
+    example: '15 yıllık kurumsal mobilya üretim deneyimi.',
+  })
   @IsOptional()
   @IsString()
   description?: string;
+  @ApiPropertyOptional({ example: 'Aylik 50000 adet uretim kapasitesi' })
+  @IsOptional()
+  @IsString()
+  capacity?: string;
 }

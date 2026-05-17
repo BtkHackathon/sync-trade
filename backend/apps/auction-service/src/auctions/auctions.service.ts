@@ -7,12 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import {
-  AuctionStatus,
-  BidStatus,
-  CompanyRole,
-  Prisma,
-} from '@prisma/client';
+import { AuctionStatus, BidStatus, CompanyRole, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { JwtPayload } from '@app/common';
 import {
@@ -111,10 +106,7 @@ export class AuctionsService {
         where,
         skip,
         take: limit,
-        orderBy: [
-          { status: 'asc' },
-          { endsAt: 'asc' },
-        ],
+        orderBy: [{ status: 'asc' }, { endsAt: 'asc' }],
         include: this.auctionListInclude,
       }),
       this.prisma.auction.count({ where }),
@@ -136,7 +128,9 @@ export class AuctionsService {
 
     const auction = await this.prisma.auction.findUnique({
       where: { id },
-      include: isOwner ? this.auctionOwnerDetailInclude : this.auctionPublicInclude,
+      include: isOwner
+        ? this.auctionOwnerDetailInclude
+        : this.auctionPublicInclude,
     });
 
     if (!auction) {
@@ -184,10 +178,13 @@ export class AuctionsService {
     if (dto.deliveryDeadline !== undefined) {
       data.deliveryDeadline = new Date(dto.deliveryDeadline);
     }
-    if (dto.deliveryAddress !== undefined) data.deliveryAddress = dto.deliveryAddress;
-    if (dto.requirements !== undefined) data.requirements = { set: dto.requirements };
+    if (dto.deliveryAddress !== undefined)
+      data.deliveryAddress = dto.deliveryAddress;
+    if (dto.requirements !== undefined)
+      data.requirements = { set: dto.requirements };
     if (dto.endsAt !== undefined) data.endsAt = new Date(dto.endsAt);
-    if (dto.specDocumentUrl !== undefined) data.specDocumentUrl = dto.specDocumentUrl;
+    if (dto.specDocumentUrl !== undefined)
+      data.specDocumentUrl = dto.specDocumentUrl;
 
     return this.prisma.auction.update({
       where: { id },
@@ -200,28 +197,34 @@ export class AuctionsService {
     const auction = await this.getOwnedAuction(id, buyerId);
 
     if (auction.status !== AuctionStatus.DRAFT) {
-      throw new BadRequestException('Sadece taslak ihaleler yayına alınabilir.');
+      throw new BadRequestException(
+        'Sadece taslak ihaleler yayına alınabilir.',
+      );
     }
 
     if (auction.endsAt <= new Date()) {
-      throw new BadRequestException('Bitiş tarihi geçmiş ihale yayına alınamaz.');
+      throw new BadRequestException(
+        'Bitiş tarihi geçmiş ihale yayına alınamaz.',
+      );
     }
 
-    const { openedAuction, outboxId } = await this.prisma.$transaction(async (tx) => {
-      const openedAuction = await tx.auction.update({
-        where: { id },
-        data: { status: AuctionStatus.OPEN },
-        include: this.auctionOwnerDetailInclude,
-      });
+    const { openedAuction, outboxId } = await this.prisma.$transaction(
+      async (tx) => {
+        const openedAuction = await tx.auction.update({
+          where: { id },
+          data: { status: AuctionStatus.OPEN },
+          include: this.auctionOwnerDetailInclude,
+        });
 
-      const outboxRecord = await this.outbox.enqueue(
-        tx,
-        RedisEvents.AUCTION_OPENED,
-        this.buildAuctionOpenedEvent(openedAuction),
-      );
+        const outboxRecord = await this.outbox.enqueue(
+          tx,
+          RedisEvents.AUCTION_OPENED,
+          this.buildAuctionOpenedEvent(openedAuction),
+        );
 
-      return { openedAuction, outboxId: outboxRecord.id };
-    });
+        return { openedAuction, outboxId: outboxRecord.id };
+      },
+    );
 
     await this.outbox.publishOne(outboxId);
 
@@ -235,21 +238,23 @@ export class AuctionsService {
       throw new BadRequestException('Sadece açık ihaleler kapatılabilir.');
     }
 
-    const { closedAuction, outboxId } = await this.prisma.$transaction(async (tx) => {
-      const closedAuction = await tx.auction.update({
-        where: { id },
-        data: { status: AuctionStatus.CLOSED },
-        include: this.auctionOwnerDetailInclude,
-      });
+    const { closedAuction, outboxId } = await this.prisma.$transaction(
+      async (tx) => {
+        const closedAuction = await tx.auction.update({
+          where: { id },
+          data: { status: AuctionStatus.CLOSED },
+          include: this.auctionOwnerDetailInclude,
+        });
 
-      const outboxRecord = await this.outbox.enqueue(
-        tx,
-        RedisEvents.AUCTION_CLOSED,
-        this.buildAuctionClosedEvent(closedAuction),
-      );
+        const outboxRecord = await this.outbox.enqueue(
+          tx,
+          RedisEvents.AUCTION_CLOSED,
+          this.buildAuctionClosedEvent(closedAuction),
+        );
 
-      return { closedAuction, outboxId: outboxRecord.id };
-    });
+        return { closedAuction, outboxId: outboxRecord.id };
+      },
+    );
 
     await this.outbox.publishOne(outboxId);
 
@@ -263,7 +268,7 @@ export class AuctionsService {
       auction.status !== AuctionStatus.DRAFT &&
       auction.status !== AuctionStatus.OPEN
     ) {
-      throw new BadRequestException('Bu durumdaki ihale iptal edilemez.');  // DRAFT ve OPEN iptal edilebilir
+      throw new BadRequestException('Bu durumdaki ihale iptal edilemez.'); // DRAFT ve OPEN iptal edilebilir
     }
 
     return this.prisma.auction.update({
@@ -288,7 +293,9 @@ export class AuctionsService {
         }
 
         if (auction.buyerId !== buyerId) {
-          throw new ForbiddenException('Bu ihale üzerinde işlem yapma yetkiniz yok.');
+          throw new ForbiddenException(
+            'Bu ihale üzerinde işlem yapma yetkiniz yok.',
+          );
         }
 
         const buyer = await tx.company.findUnique({
@@ -307,7 +314,9 @@ export class AuctionsService {
         }
 
         if (auction.status !== AuctionStatus.CLOSED) {
-          throw new BadRequestException('Kazanan seçmek için ihale önce kapatılmalıdır.');
+          throw new BadRequestException(
+            'Kazanan seçmek için ihale önce kapatılmalıdır.',
+          );
         }
 
         const bid = await tx.bid.findFirst({
@@ -354,7 +363,10 @@ export class AuctionsService {
 
     await this.outbox.publishOne(outboxId);
 
-    return this.findOne(id, { sub: buyerId, role: CompanyRole.BUYER } as JwtPayload);
+    return this.findOne(id, {
+      sub: buyerId,
+      role: CompanyRole.BUYER,
+    } as JwtPayload);
   }
 
   @Cron(CronExpression.EVERY_MINUTE)
@@ -479,11 +491,15 @@ export class AuctionsService {
     }
 
     if (buyer.role !== CompanyRole.BUYER) {
-      throw new ForbiddenException('Sadece alıcı firmalar ihale işlemi yapabilir.');
+      throw new ForbiddenException(
+        'Sadece alıcı firmalar ihale işlemi yapabilir.',
+      );
     }
 
     if (!buyer.isVerified) {
-      throw new ForbiddenException('Firma doğrulaması tamamlanmadan ihale işlemi yapılamaz.');
+      throw new ForbiddenException(
+        'Firma doğrulaması tamamlanmadan ihale işlemi yapılamaz.',
+      );
     }
   }
 
@@ -504,7 +520,9 @@ export class AuctionsService {
     }
 
     if (auction.buyerId !== buyerId) {
-      throw new ForbiddenException('Bu ihale üzerinde işlem yapma yetkiniz yok.');
+      throw new ForbiddenException(
+        'Bu ihale üzerinde işlem yapma yetkiniz yok.',
+      );
     }
 
     await this.assertVerifiedBuyer(buyerId);
@@ -522,7 +540,9 @@ export class AuctionsService {
     const endDate = this.toDate(endsAt);
 
     if (requireBoth && (!deliveryDate || !endDate)) {
-      throw new BadRequestException('Teslim tarihi ve ihale bitiş tarihi zorunludur.');
+      throw new BadRequestException(
+        'Teslim tarihi ve ihale bitiş tarihi zorunludur.',
+      );
     }
 
     if (deliveryDate && deliveryDate <= now) {
@@ -534,7 +554,9 @@ export class AuctionsService {
     }
 
     if (deliveryDate && endDate && deliveryDate <= endDate) {
-      throw new BadRequestException('Teslim tarihi ihale bitiş tarihinden sonra olmalıdır.');
+      throw new BadRequestException(
+        'Teslim tarihi ihale bitiş tarihinden sonra olmalıdır.',
+      );
     }
   }
 
@@ -579,7 +601,9 @@ export class AuctionsService {
       title: auction.title,
       totalBids: auction.bidCount,
       lowestBidAmount:
-        auction.lowestBidAmount === null ? null : Number(auction.lowestBidAmount),
+        auction.lowestBidAmount === null
+          ? null
+          : Number(auction.lowestBidAmount),
       closedAt: new Date().toISOString(),
     };
   }

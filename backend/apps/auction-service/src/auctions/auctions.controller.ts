@@ -29,10 +29,7 @@ export class AuctionsController {
   @Post()
   @Roles(CompanyRole.BUYER)
   @ApiOperation({ summary: 'Yeni ihale olustur (BUYER)' })
-  create(
-    @CurrentCompany() company: JwtPayload,
-    @Body() dto: CreateAuctionDto,
-  ) {
+  create(@CurrentCompany() company: JwtPayload, @Body() dto: CreateAuctionDto) {
     return this.auctionsService.create(company.sub, dto);
   }
 
@@ -45,10 +42,7 @@ export class AuctionsController {
   @Get(':id')
   @ApiOperation({ summary: 'Ihale detayini getir' })
   @ApiParam({ name: 'id', description: 'Auction id' })
-  findOne(
-    @Param('id') id: string,
-    @CurrentCompany() company: JwtPayload,
-  ) {
+  findOne(@Param('id') id: string, @CurrentCompany() company: JwtPayload) {
     return this.auctionsService.findOne(id, company);
   }
 

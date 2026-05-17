@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { buildCorsOptions } from '@app/common';
 import { BidServiceModule } from './bid-service.module';
 
 async function bootstrap() {
@@ -10,7 +11,7 @@ async function bootstrap() {
   const logger = new Logger('BidService');
 
   app.setGlobalPrefix('api');
-  app.enableCors();
+  app.enableCors(buildCorsOptions(config));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -23,7 +24,9 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('SyncTrade — Bid Service')
-    .setDescription('Teklif motoru: Redis distributed lock + PostgreSQL transaction')
+    .setDescription(
+      'Teklif motoru: Redis distributed lock + PostgreSQL transaction',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .build();
@@ -40,4 +43,4 @@ async function bootstrap() {
   logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
-bootstrap();
+void bootstrap();

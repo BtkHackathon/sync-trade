@@ -17,11 +17,7 @@ export class EventOutboxService {
     private readonly events: EventsService,
   ) {}
 
-  async enqueue<T>(
-    writer: OutboxWriter,
-    event: RedisEvents,
-    payload: T,
-  ) {
+  async enqueue<T>(writer: OutboxWriter, event: RedisEvents, payload: T) {
     return writer.eventOutbox.create({
       data: {
         event,
@@ -58,7 +54,10 @@ export class EventOutboxService {
     }
 
     try {
-      await this.events.publish(outboxEvent.event as RedisEvents, outboxEvent.payload);
+      await this.events.publish(
+        outboxEvent.event as RedisEvents,
+        outboxEvent.payload,
+      );
 
       await this.prisma.eventOutbox.update({
         where: { id },

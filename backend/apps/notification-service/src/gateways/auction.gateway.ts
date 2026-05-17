@@ -8,11 +8,12 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { JwtPayload } from '@app/common';
+import { CompanyRole, JwtPayload, buildSocketCorsOptions } from '@app/common';
+import { PrismaService } from '@app/database';
 
 @WebSocketGateway({
   namespace: '/auctions',
-  cors: { origin: '*' },
+  cors: buildSocketCorsOptions(),
 })
 export class AuctionGateway implements OnGatewayInit, OnGatewayConnection {
   private readonly logger = new Logger(AuctionGateway.name);
@@ -20,10 +21,13 @@ export class AuctionGateway implements OnGatewayInit, OnGatewayConnection {
   @WebSocketServer()
   server: Server;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   afterInit() {
-    this.logger.log('WebSocket namespace /auctions hazır');
+    this.logger.log('WebSocket namespace /auctions hazir');
   }
 
   handleConnection(client: Socket) {
@@ -34,40 +38,46 @@ export class AuctionGateway implements OnGatewayInit, OnGatewayConnection {
     const token = raw?.startsWith('Bearer ') ? raw.slice(7) : raw;
 
     if (!token) {
-      this.logger.warn(`Bağlantı reddedildi [${client.id}]: token yok`);
-      client.emit('error', { message: 'Kimlik doğrulama gerekli' });
-      client.disconnect();
+      this.reject(client, 'Kimlik dogrulama gerekli');
       return;
     }
 
     try {
-      const payload = this.jwtService.verify<JwtPayload>(token);
-      client.data.user = payload;
+      client.data.user = this.jwtService.verify<JwtPayload>(token);
     } catch {
-      this.logger.warn(`Bağlantı reddedildi [${client.id}]: geçersiz token`);
-      client.emit('error', { message: 'Geçersiz ya da süresi dolmuş token' });
-      client.disconnect();
+      this.reject(client, 'Gecersiz ya da suresi dolmus token');
     }
   }
 
   @SubscribeMessage('join-auction')
-  handleJoin(client: Socket, payload: { auctionId: string }) {
-    const room = payload?.auctionId;
-    if (!room) {
+  async handleJoin(client: Socket, payload: { auctionId: string }) {
+    const auctionId = payload?.auctionId;
+    const user = client.data.user as JwtPayload | undefined;
+
+    if (!auctionId) {
       return { ok: false, error: 'auctionId gerekli' };
     }
-    void client.join(room);
-    return { ok: true, auctionId: room };
+
+    if (!user || !(await this.canJoinAuction(auctionId, user))) {
+      this.logger.warn(
+        `Room join reddedildi client=${client.id} auction=${auctionId}`,
+      );
+      return { ok: false, error: 'Bu ihale odasina erisim yetkiniz yok' };
+    }
+
+    await client.join(auctionId);
+    return { ok: true, auctionId };
   }
 
   @SubscribeMessage('leave-auction')
-  handleLeave(client: Socket, payload: { auctionId: string }) {
-    const room = payload?.auctionId;
-    if (!room) {
+  async handleLeave(client: Socket, payload: { auctionId: string }) {
+    const auctionId = payload?.auctionId;
+    if (!auctionId) {
       return { ok: false, error: 'auctionId gerekli' };
     }
-    void client.leave(room);
-    return { ok: true, auctionId: room };
+
+    await client.leave(auctionId);
+    return { ok: true, auctionId };
   }
 
   emitAuctionEvent(auctionId: string, eventName: string, payload: unknown) {
@@ -75,5 +85,43 @@ export class AuctionGateway implements OnGatewayInit, OnGatewayConnection {
       return;
     }
     this.server.to(auctionId).emit(eventName, payload);
+  }
+
+  private async canJoinAuction(
+    auctionId: string,
+    user: JwtPayload,
+  ): Promise<boolean> {
+    const auction = await this.prisma.auction.findUnique({
+      where: { id: auctionId },
+      select: {
+        buyerId: true,
+        status: true,
+        bids: {
+          where: { supplierId: user.sub },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!auction) {
+      return false;
+    }
+
+    if (user.role === CompanyRole.BUYER) {
+      return auction.buyerId === user.sub;
+    }
+
+    if (user.role === CompanyRole.SUPPLIER) {
+      return auction.status === 'OPEN' || auction.bids.length > 0;
+    }
+
+    return false;
+  }
+
+  private reject(client: Socket, message: string): void {
+    this.logger.warn(`Baglanti reddedildi [${client.id}]: ${message}`);
+    client.emit('error', { message });
+    client.disconnect();
   }
 }

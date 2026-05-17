@@ -13,7 +13,7 @@ export class AuthProxyController {
     return this.proxyService.upstream('auth', req, res);
   }
 
-  @All('*')
+  @All('*path')
   forwardNested(@Req() req: Request, @Res() res: Response) {
     return this.proxyService.upstream('auth', req, res);
   }
@@ -29,7 +29,7 @@ export class CompaniesProxyController {
     return this.proxyService.upstream('auth', req, res);
   }
 
-  @All('*')
+  @All('*path')
   forwardNested(@Req() req: Request, @Res() res: Response) {
     return this.proxyService.upstream('auth', req, res);
   }
@@ -45,7 +45,7 @@ export class AuctionsProxyController {
     return this.proxyService.upstream('auction', req, res);
   }
 
-  @All('*')
+  @All('*path')
   forwardNested(@Req() req: Request, @Res() res: Response) {
     return this.proxyService.upstream('auction', req, res);
   }
@@ -61,7 +61,7 @@ export class BidsProxyController {
     return this.proxyService.upstream('bid', req, res);
   }
 
-  @All('*')
+  @All('*path')
   forwardNested(@Req() req: Request, @Res() res: Response) {
     return this.proxyService.upstream('bid', req, res);
   }
@@ -77,7 +77,7 @@ export class AiProxyController {
     return this.proxyService.upstream('ai', req, res);
   }
 
-  @All('*')
+  @All('*path')
   forwardNested(@Req() req: Request, @Res() res: Response) {
     return this.proxyService.upstream('ai', req, res);
   }

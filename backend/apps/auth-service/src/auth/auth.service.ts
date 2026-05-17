@@ -24,13 +24,17 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.company.findUnique({ where: { email: dto.email } });
+    const existing = await this.prisma.company.findUnique({
+      where: { email: dto.email },
+    });
     if (existing) {
       throw new ConflictException('Bu e-posta adresi zaten kayıtlı.');
     }
 
     if (dto.taxId) {
-      const existingTax = await this.prisma.company.findUnique({ where: { taxId: dto.taxId } });
+      const existingTax = await this.prisma.company.findUnique({
+        where: { taxId: dto.taxId },
+      });
       if (existingTax) {
         throw new ConflictException('Bu vergi numarası zaten kayıtlı.');
       }
@@ -58,6 +62,7 @@ export class AuthService {
         await tx.supplierProfile.create({
           data: {
             companyId: created.id,
+            capacity: dto.capacity,
             certifications: dto.certifications ?? [],
             specializations: dto.specializations ?? [],
           },
@@ -73,12 +78,17 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const company = await this.prisma.company.findUnique({ where: { email: dto.email } });
+    const company = await this.prisma.company.findUnique({
+      where: { email: dto.email },
+    });
     if (!company) {
       throw new UnauthorizedException('E-posta veya şifre hatalı.');
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, company.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      company.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('E-posta veya şifre hatalı.');
     }

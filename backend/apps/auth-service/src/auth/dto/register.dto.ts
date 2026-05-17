@@ -61,13 +61,27 @@ export class RegisterDto {
   @MaxLength(2)
   country?: string;
 
-  @ApiPropertyOptional({ example: ['ISO 9001', 'OEKO-TEX'], description: 'Tedarikçi sertifikaları' })
+  @ApiPropertyOptional({
+    example: 'Aylik 50000 adet uretim kapasitesi',
+    description: 'Tedarikci kapasite bilgisi',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  capacity?: string;
+  @ApiPropertyOptional({
+    example: ['ISO 9001', 'OEKO-TEX'],
+    description: 'Tedarikçi sertifikaları',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   certifications?: string[];
 
-  @ApiPropertyOptional({ example: ['Pamuklu kumaş', 'Polyester'], description: 'Uzmanlık alanları' })
+  @ApiPropertyOptional({
+    example: ['Pamuklu kumaş', 'Polyester'],
+    description: 'Uzmanlık alanları',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
