@@ -177,7 +177,7 @@ export default function AIPage() {
           <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
             <div className="text-right">
               <p className="text-blue-300 text-xs font-semibold">Google Gemini</p>
-              <p className="text-slate-500 text-xs">text-embedding-004 · gemini-2.0-flash</p>
+              <p className="text-slate-500 text-xs">text-embedding-004 · gemini-2.5-flash</p>
             </div>
             <Sparkles className="w-6 h-6 text-blue-400" />
           </div>

@@ -48,7 +48,7 @@ export class AiReport {
   @Prop({ type: [String], default: [] })
   ragContextUsed: string[];
 
-  @Prop({ default: 'gemini-1.5-pro' })
+  @Prop({ default: 'gemini-2.5-flash' })
   modelUsed: string;
 
   @Prop({ required: true })

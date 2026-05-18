@@ -108,9 +108,8 @@ export const bidsApi = {
 // ── AI ────────────────────────────────────────────────────────────────────
 export const aiApi = {
   analyzeSpec: (formData: FormData) =>
-    api.post('/ai/analyze-spec', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }),
+    // Content-Type axios tarafından boundary ile otomatik ayarlanır
+    api.post('/ai/analyze-spec', formData),
 
   analyzeAuction: (auctionId: string) =>
     api.post(`/ai/auctions/${auctionId}/analyze`),

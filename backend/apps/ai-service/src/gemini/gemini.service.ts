@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GenerativeModel, GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -13,7 +17,10 @@ export class GeminiService {
   readonly modelName: string;
 
   constructor(private readonly config: ConfigService) {
-    this.modelName = this.config.get<string>('GEMINI_MODEL', 'gemini-1.5-pro');
+    this.modelName = this.config.get<string>(
+      'GEMINI_MODEL',
+      'gemini-2.5-flash',
+    );
 
     const apiKey = this.config.get<string>('GEMINI_API_KEY');
     if (!apiKey || apiKey.includes('your-gemini-api-key')) {
@@ -84,10 +91,18 @@ export class GeminiService {
       const text = result.response.text();
       return this.parseJson<T>(text);
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (/429|quota|Too Many Requests|RESOURCE_EXHAUSTED/i.test(message)) {
+        this.logger.warn(`Gemini quota/rate limit for ${options.task}: ${message}`);
+        throw new ServiceUnavailableException(
+          'Gemini API kotası doldu veya ücretsiz planda bu model kullanılamıyor. ' +
+            'Google AI Studio\'da kotanızı kontrol edin, ~30 sn bekleyin veya faturalandırmayı açın.',
+        );
+      }
+
       this.logger.warn(
-        `Gemini failed for ${options.task}; fallback used. ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Gemini failed for ${options.task}; fallback used. ${message}`,
       );
       return options.fallback;
     }

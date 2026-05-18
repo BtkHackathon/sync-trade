@@ -3,9 +3,10 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileText, Upload, Loader2, Sparkles, CheckCircle2, X } from 'lucide-react';
+import axios from 'axios';
 import { cn } from '@/lib/utils';
 import { aiApi } from '@/lib/api';
-import type { SpecAnalysisResult } from '@/types';
+import type { ApiResponse, SpecAnalysisResult } from '@/types';
 
 interface SpecUploadProps {
   onAnalysisComplete: (result: SpecAnalysisResult) => void;
@@ -31,23 +32,27 @@ export function SpecUpload({ onAnalysisComplete }: SpecUploadProps) {
         const formData = new FormData();
         formData.append('file', file);
 
-        // AI servisi gateway'den geçmiyor; direkt localhost:3004 kullan
-        const AI_DIRECT =
-          process.env.NEXT_PUBLIC_AI_DIRECT_URL ?? 'http://localhost:3004/api';
-        const { data } = await import('axios').then((m) =>
-          m.default.post(`${AI_DIRECT}/ai/analyze-spec`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          }),
-        );
+        const res = await aiApi.analyzeSpec(formData);
+        const result = (res.data as ApiResponse<SpecAnalysisResult>).data;
 
         setState('done');
-        onAnalysisComplete(
-          (data as { data: { analysisResult: SpecAnalysisResult } }).data
-            .analysisResult,
-        );
-      } catch {
+        onAnalysisComplete(result);
+      } catch (err) {
         setState('error');
-        setErrorMsg('Analiz başarısız. Lütfen geçerli bir PDF yükleyin.');
+        if (axios.isAxiosError(err)) {
+          if (err.response?.status === 401) {
+            setErrorMsg('Oturum süresi dolmuş. Çıkış yapıp tekrar giriş yapın.');
+          } else if (err.response?.status === 502) {
+            setErrorMsg('AI servisine ulaşılamadı. AI servisinin çalıştığından emin olun.');
+          } else {
+            const msg = (err.response?.data as { message?: string })?.message;
+            setErrorMsg(
+              msg ?? 'Analiz başarısız. Lütfen geçerli bir PDF yükleyin (maks. 10 MB).',
+            );
+          }
+        } else {
+          setErrorMsg('Analiz başarısız. Lütfen geçerli bir PDF yükleyin.');
+        }
       }
     },
     [onAnalysisComplete],

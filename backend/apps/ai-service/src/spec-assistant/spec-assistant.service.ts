@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { PDFParse } from 'pdf-parse';
 import { GeminiService } from '../gemini/gemini.service';
 import { SpecAnalysisResult } from '../analysis/analysis.types';
 
@@ -39,11 +40,19 @@ export class SpecAssistantService {
     }
 
     if (input.file.mimetype === 'application/pdf') {
-      const pdfParse = require('pdf-parse') as (
-        buffer: Buffer,
-      ) => Promise<{ text: string }>;
-      const result = await pdfParse(input.file.buffer);
-      return result.text.trim();
+      const parser = new PDFParse({ data: input.file.buffer });
+      try {
+        const result = await parser.getText();
+        const text = result.text?.trim() ?? '';
+        if (!text) {
+          throw new BadRequestException(
+            'PDF dosyasından metin çıkarılamadı. Taranmış (görüntü) PDF olabilir.',
+          );
+        }
+        return text;
+      } finally {
+        await parser.destroy();
+      }
     }
 
     if (input.file.mimetype.startsWith('text/')) {
