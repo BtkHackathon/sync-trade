@@ -109,10 +109,10 @@ function CircularScore({ score, label, max = 100 }: { score: number; label: stri
 function RankingRow({ ranking, onAward, delay }: { ranking: SupplierRanking; onAward?: () => void; delay: number }) {
   return (
     <div
-      className="slide-up flex items-center gap-4 p-4 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all"
+      className="slide-up flex items-center gap-3 p-4 rounded-lg border border-slate-100 hover:border-slate-200 hover:bg-slate-50 transition-all min-w-0 overflow-hidden"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
         ranking.rank === 1 ? 'bg-emerald-600 text-white' :
         ranking.rank === 2 ? 'bg-blue-500 text-white' :
         ranking.rank === 3 ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-600'
@@ -121,9 +121,9 @@ function RankingRow({ ranking, onAward, delay }: { ranking: SupplierRanking; onA
       </div>
 
       <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-[#0F172A]">{ranking.supplierName}</p>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskColor(ranking.riskLevel)}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-[#0F172A] truncate">{ranking.supplierName}</p>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${riskColor(ranking.riskLevel)}`}>
             {ranking.riskLevel === 'LOW' ? 'Düşük Risk' : ranking.riskLevel === 'MEDIUM' ? 'Orta Risk' : 'Yüksek Risk'}
           </span>
         </div>
@@ -257,9 +257,9 @@ export function AIDashboard({ auctionId, isOwner = false, onAward }: AIDashboard
   ] : [];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 w-full overflow-hidden">
       {/* Başlık banner */}
-      <div className="bg-gradient-to-r from-[#0F172A] to-[#1e3a5f] rounded-xl p-5 flex items-center gap-4 slide-up">
+      <div className="bg-gradient-to-r from-[#0F172A] to-[#1e3a5f] rounded-xl p-5 flex flex-wrap items-center gap-4 slide-up">
         <div className="w-12 h-12 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
           <Sparkles className="w-6 h-6 text-blue-400" />
         </div>
@@ -327,40 +327,37 @@ export function AIDashboard({ auctionId, isOwner = false, onAward }: AIDashboard
 
       {/* ── GRAFİK 1: Teklif Karşılaştırması ── */}
       {bidChartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 slide-up" style={{ animationDelay: '200ms' }}>
+        <div className="bg-white rounded-xl border border-slate-200 p-5 slide-up overflow-hidden" style={{ animationDelay: '200ms' }}>
           <p className="text-sm font-semibold text-[#0F172A] mb-1 flex items-center gap-2">
             <TrendingDown className="w-4 h-4 text-emerald-600" />
             Teklif Karşılaştırması
           </p>
           <p className="text-xs text-slate-500 mb-4">Tedarikçilerin teklif tutarları (düşük = iyi)</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={bidChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
-              <YAxis
-                tickFormatter={(v) => `₺${(v / 1000).toFixed(0)}K`}
-                tick={{ fontSize: 10, fill: '#94A3B8' }}
-                axisLine={false}
-                tickLine={false}
-                width={52}
-              />
-              <Tooltip content={<BidTooltip />} cursor={{ fill: '#F8FAFC' }} />
-              {analysis.lowestBid.amount > 0 && (
-                <ReferenceLine
-                  y={analysis.lowestBid.amount}
-                  stroke="#10B981"
-                  strokeDasharray="4 3"
-                  label={{ value: 'En Düşük', position: 'right', fontSize: 10, fill: '#10B981' }}
+          <div className="w-full" style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bidChartData} margin={{ top: 8, right: 4, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis
+                  tickFormatter={(v) => `₺${(v / 1000).toFixed(0)}K`}
+                  tick={{ fontSize: 10, fill: '#94A3B8' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={48}
                 />
-              )}
-              <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
-                {bidChartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} opacity={i === 0 ? 1 : 0.7} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="flex flex-wrap gap-2 mt-2">
+                <Tooltip content={<BidTooltip />} cursor={{ fill: '#F8FAFC' }} />
+                {analysis.lowestBid.amount > 0 && (
+                  <ReferenceLine y={analysis.lowestBid.amount} stroke="#10B981" strokeDasharray="4 3" />
+                )}
+                <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
+                  {bidChartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} opacity={i === 0 ? 1 : 0.7} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
             {bidChartData.map((d, i) => (
               <span key={i} className="inline-flex items-center gap-1.5 text-xs text-slate-600">
                 <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: d.fill }} />
@@ -373,57 +370,57 @@ export function AIDashboard({ auctionId, isOwner = false, onAward }: AIDashboard
 
       {/* ── GRAFİK 2: AI Skor Sıralaması ── */}
       {scoreChartData.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 slide-up" style={{ animationDelay: '260ms' }}>
+        <div className="bg-white rounded-xl border border-slate-200 p-5 slide-up overflow-hidden" style={{ animationDelay: '260ms' }}>
           <p className="text-sm font-semibold text-[#0F172A] mb-1 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-500" />
             AI Skor Sıralaması
           </p>
           <p className="text-xs text-slate-500 mb-4">Fiyat, güvenilirlik ve teslimat geçmişi birleştirilmiş skor (yüksek = iyi)</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={scoreChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={28} />
-              <Tooltip content={<ScoreTooltip />} cursor={{ fill: '#F8FAFC' }} />
-              <ReferenceLine y={60} stroke="#94A3B8" strokeDasharray="4 3" label={{ value: 'Eşik', position: 'right', fontSize: 10, fill: '#94A3B8' }} />
-              <Bar dataKey="aiScore" radius={[6, 6, 0, 0]}>
-                {scoreChartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} opacity={i === 0 ? 1 : 0.7} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="w-full" style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={scoreChartData} margin={{ top: 8, right: 4, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={28} />
+                <Tooltip content={<ScoreTooltip />} cursor={{ fill: '#F8FAFC' }} />
+                <ReferenceLine y={60} stroke="#94A3B8" strokeDasharray="4 3" />
+                <Bar dataKey="aiScore" radius={[6, 6, 0, 0]}>
+                  {scoreChartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.fill} opacity={i === 0 ? 1 : 0.7} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       )}
 
       {/* ── GRAFİK 3: Kazanan Tedarikçi Radar ── */}
       {winnerRanking && radarData.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5 slide-up" style={{ animationDelay: '320ms' }}>
-          <div className="flex items-start gap-4">
-            {/* Radar */}
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-[#0F172A] mb-1 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-blue-600" />
-                {winnerRanking.supplierName} — Performans Profili
-              </p>
-              <p className="text-xs text-slate-500 mb-2">AI önerilen kazananın çok boyutlu değerlendirmesi</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="#E2E8F0" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: '#64748B' }} />
-                  <Radar dataKey="value" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.18} strokeWidth={2} />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-            {/* Dairesel skorlar */}
-            <div className="flex flex-col gap-4 pt-8">
-              <CircularScore score={Math.round(winnerRanking.reliabilityScore * 10)} label="Güvenilirlik" />
-              <CircularScore score={winnerRanking.aiScore} label="AI Skoru" />
-              <CircularScore
-                score={winnerRanking.riskLevel === 'LOW' ? 90 : winnerRanking.riskLevel === 'MEDIUM' ? 55 : 20}
-                label="Risk Uyumu"
-              />
-            </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-5 slide-up overflow-hidden" style={{ animationDelay: '320ms' }}>
+          <p className="text-sm font-semibold text-[#0F172A] mb-1 flex items-center gap-2 min-w-0">
+            <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+            <span className="truncate">{winnerRanking.supplierName} — Performans Profili</span>
+          </p>
+          <p className="text-xs text-slate-500 mb-4">AI önerilen kazananın çok boyutlu değerlendirmesi</p>
+          {/* Radar */}
+          <div className="w-full" style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="65%">
+                <PolarGrid stroke="#E2E8F0" />
+                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: '#64748B' }} />
+                <Radar dataKey="value" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.18} strokeWidth={2} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Dairesel skorlar — yatay, grafiğin altında */}
+          <div className="grid grid-cols-3 gap-3 mt-4">
+            <CircularScore score={Math.round(winnerRanking.reliabilityScore * 10)} label="Güvenilirlik" />
+            <CircularScore score={winnerRanking.aiScore} label="AI Skoru" />
+            <CircularScore
+              score={winnerRanking.riskLevel === 'LOW' ? 90 : winnerRanking.riskLevel === 'MEDIUM' ? 55 : 20}
+              label="Risk Uyumu"
+            />
           </div>
         </div>
       )}

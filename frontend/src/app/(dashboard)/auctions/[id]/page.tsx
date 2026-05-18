@@ -437,7 +437,7 @@ export default function AuctionDetailPage({
           {/* AI analizi tab */}
           {(auction.status === 'CLOSED' || auction.status === 'AWARDED') &&
             (isOwner || (!isBuyer && (myBids?.length ?? 0) > 0)) && (
-            <TabsContent value="ai" className="mt-5">
+            <TabsContent value="ai" className="mt-5 overflow-hidden">
               <AIDashboard
                 auctionId={id}
                 isOwner={isOwner}
