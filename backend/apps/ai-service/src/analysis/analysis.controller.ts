@@ -30,7 +30,7 @@ export class AnalysisController {
   @Post('auctions/:auctionId/analyze')
   @Roles(CompanyRole.BUYER)
   @ApiOperation({
-    summary: 'Kapali ihale icin AI risk ve kazanan onerisi uret',
+    summary: 'Kapalı ihale için AI risk ve kazanan önerisi üret',
   })
   @ApiParam({ name: 'auctionId', description: 'Auction ID' })
   analyzeAuction(
@@ -43,7 +43,7 @@ export class AnalysisController {
   @Post('detect-fraud/:auctionId')
   @Roles(CompanyRole.BUYER)
   @ApiOperation({
-    summary: 'Ihale tekliflerinde fraud/kartel riskini analiz et',
+    summary: 'İhale tekliflerinde fraud/kartel riskini analiz et',
   })
   @ApiParam({ name: 'auctionId', description: 'Auction ID' })
   detectFraud(
@@ -55,7 +55,7 @@ export class AnalysisController {
 
   @Post('analyze-supplier/:id')
   @Roles(CompanyRole.BUYER)
-  @ApiOperation({ summary: 'Tedarikci guven ve performans riskini analiz et' })
+  @ApiOperation({ summary: 'Tedarikçi güven ve performans riskini analiz et' })
   @ApiParam({ name: 'id', description: 'Supplier company ID' })
   analyzeSupplier(
     @Param('id', new ParseUUIDPipe({ version: '4' })) supplierId: string,
@@ -71,7 +71,7 @@ export class AnalysisController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Sartname metni/PDF dosyasindan ihale form alanlari cikar',
+    summary: 'Şartname metni/PDF dosyasından ihale form alanları çıkar',
   })
   @ApiBody({
     schema: {

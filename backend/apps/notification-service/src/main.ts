@@ -2,19 +2,29 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-import { buildCorsOptions } from '@app/common';
 import { NotificationServiceModule } from './notification-service.module';
-import { RedisIoAdapter } from './redis-io.adapter';
+
+function corsOrigins(config: ConfigService): string[] {
+  const raw = config.get<string>('CORS_ORIGINS', '');
+  const parsed = raw
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return parsed.length > 0
+    ? parsed
+    : [
+        'http://localhost:4000',
+        'http://localhost:3000',
+        'http://localhost:5173',
+      ];
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(NotificationServiceModule);
   const config = app.get(ConfigService);
   const logger = new Logger('NotificationService');
-  const redisIoAdapter = new RedisIoAdapter(app);
 
-  await redisIoAdapter.connectToRedis();
-  app.useWebSocketAdapter(redisIoAdapter);
-  app.enableCors(buildCorsOptions(config));
+  app.enableCors({ origin: corsOrigins(config), credentials: true });
   app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
@@ -38,9 +48,11 @@ async function bootstrap() {
   const port = config.get<number>('NOTIFICATION_SERVICE_PORT', 3005);
   await app.listen(port);
 
-  logger.log('Notification service calisiyor');
-  logger.log(`ws://localhost:${port}/auctions`);
-  logger.log(`http://localhost:${port}/api/docs`);
+  logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  logger.log(`  🔔  NOTIFICATION SERVICE çalışıyor`);
+  logger.log(`  🔌  ws://localhost:${port}/auctions  (WebSocket)`);
+  logger.log(`  📖  http://localhost:${port}/api/docs  (Swagger UI)`);
+  logger.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 
 void bootstrap();

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { CommonModule, JwtStrategy } from '@app/common';
+import { CommonModule } from '@app/common';
 import { AnalysisModule } from './analysis/analysis.module';
 import { AuctionListenerService } from './listener/auction-listener.service';
 
@@ -10,6 +10,6 @@ import { AuctionListenerService } from './listener/auction-listener.service';
     CommonModule,
     AnalysisModule,
   ],
-  providers: [JwtStrategy, AuctionListenerService],
+  providers: [AuctionListenerService],
 })
 export class AiServiceModule {}

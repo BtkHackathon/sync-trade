@@ -20,6 +20,7 @@ import {
 } from '@app/database';
 import { CompanyRole, JwtPayload } from '@app/common';
 import { EventsService, RedisEvents } from '@app/events';
+import { Prisma } from '@prisma/client';
 import { GeminiService } from '../gemini/gemini.service';
 import { FraudService } from '../fraud/fraud.service';
 import { RagService } from '../rag/rag.service';
@@ -27,12 +28,51 @@ import { SpecAssistantService } from '../spec-assistant/spec-assistant.service';
 import {
   AuctionAnalysisResult,
   BidForFraud,
+  BidHistoryForFraud,
   FraudDetectionResult,
   SpecAnalysisResult,
   StoredAuctionReport,
   SupplierRanking,
   SupplierRiskResult,
 } from './analysis.types';
+
+// Prisma'nın include'lu sorgu dönüş tipini statik olarak çıkar
+const auctionWithBidsArgs = {
+  include: {
+    buyer: { select: { id: true, name: true, email: true } },
+    bids: {
+      where: { status: 'ACTIVE' as const },
+      orderBy: { amount: 'asc' as const },
+      include: {
+        supplier: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            sector: true,
+            city: true,
+            isVerified: true,
+            supplierProfile: true,
+          },
+        },
+      },
+    },
+    bidHistories: {
+      orderBy: { createdAt: 'asc' as const },
+      take: 200,
+    },
+  },
+} as const;
+
+type AuctionWithBids = NonNullable<
+  Prisma.Result<
+    PrismaService['auction'],
+    typeof auctionWithBidsArgs,
+    'findUnique'
+  >
+>;
+type AuctionBid = AuctionWithBids['bids'][number];
+type AuctionBidHistory = AuctionWithBids['bidHistories'][number];
 
 @Injectable()
 export class AnalysisService {
@@ -100,7 +140,7 @@ export class AnalysisService {
     viewer: JwtPayload,
   ): Promise<SupplierRiskResult> {
     if (viewer.role !== CompanyRole.BUYER) {
-      throw new ForbiddenException('Only buyers can analyze supplier risk.');
+      throw new ForbiddenException('Yalnızca alıcılar tedarikçi risk analizi yapabilir.');
     }
 
     const supplier = await this.prisma.company.findUnique({
@@ -116,7 +156,7 @@ export class AnalysisService {
     });
 
     if (!supplier || supplier.role !== CompanyRole.SUPPLIER) {
-      throw new NotFoundException('Supplier not found.');
+      throw new NotFoundException('Tedarikçi bulunamadı.');
     }
 
     const fallback = this.buildSupplierFallback(supplier);
@@ -175,7 +215,7 @@ export class AnalysisService {
     });
 
     if (!auction) {
-      throw new NotFoundException('Auction not found.');
+      throw new NotFoundException('İhale bulunamadı.');
     }
 
     const canRead =
@@ -183,29 +223,29 @@ export class AnalysisService {
       (viewer.role === CompanyRole.SUPPLIER && auction.bids.length > 0);
 
     if (!canRead) {
-      throw new ForbiddenException('You cannot access this AI report.');
+      throw new ForbiddenException('Bu AI raporuna erişim yetkiniz yok.');
     }
 
     const report = await this.reports.findOne({ auctionId }).lean().exec();
     if (!report) {
-      throw new NotFoundException('AI report not found.');
+      throw new NotFoundException('AI raporu bulunamadı.');
     }
 
     return this.toStoredReport(report);
   }
 
   private async createAuctionReport(
-    auction: any,
+    auction: AuctionWithBids,
   ): Promise<StoredAuctionReport> {
     if (!['CLOSED', 'AWARDED'].includes(auction.status)) {
       throw new BadRequestException(
-        'AI report can be created after the auction is closed.',
+        'AI raporu yalnızca kapalı ihaleler için oluşturulabilir.',
       );
     }
 
     if (!auction.bids.length) {
       throw new BadRequestException(
-        'AI report requires at least one active bid.',
+        'AI raporu için en az bir aktif teklif gereklidir.',
       );
     }
 
@@ -292,7 +332,7 @@ export class AnalysisService {
     return report;
   }
 
-  private async buildRagContext(auction: any): Promise<string[]> {
+  private async buildRagContext(auction: AuctionWithBids): Promise<string[]> {
     const suppliers = auction.bids.map((bid: any) => bid.supplier);
     const baseContext = this.rag.buildSupplierMemory(suppliers);
 
@@ -354,43 +394,20 @@ export class AnalysisService {
     }
   }
 
-  private async getAuctionWithBids(auctionId: string) {
+  private async getAuctionWithBids(auctionId: string): Promise<AuctionWithBids> {
     const auction = await this.prisma.auction.findUnique({
       where: { id: auctionId },
-      include: {
-        buyer: { select: { id: true, name: true, email: true } },
-        bids: {
-          where: { status: 'ACTIVE' },
-          orderBy: { amount: 'asc' },
-          include: {
-            supplier: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                sector: true,
-                city: true,
-                isVerified: true,
-                supplierProfile: true,
-              },
-            },
-          },
-        },
-        bidHistories: {
-          orderBy: { createdAt: 'asc' },
-          take: 200,
-        },
-      },
+      ...auctionWithBidsArgs,
     });
 
     if (!auction) {
-      throw new NotFoundException('Auction not found.');
+      throw new NotFoundException('İhale bulunamadı.');
     }
 
     return auction;
   }
 
-  private assertBuyerOwnsAuction(auction: any, viewer: JwtPayload): void {
+  private assertBuyerOwnsAuction(auction: AuctionWithBids, viewer: JwtPayload): void {
     if (viewer.role !== CompanyRole.BUYER || auction.buyerId !== viewer.sub) {
       throw new ForbiddenException(
         'Only the auction owner buyer can run this analysis.',
@@ -398,7 +415,7 @@ export class AnalysisService {
     }
   }
 
-  private buildRankings(bids: any[]): SupplierRanking[] {
+  private buildRankings(bids: AuctionBid[]): SupplierRanking[] {
     const lowest = Math.min(...bids.map((bid) => this.toNumber(bid.amount)));
 
     return bids
@@ -448,7 +465,7 @@ export class AnalysisService {
   }
 
   private buildAuctionFallback(
-    auction: any,
+    auction: AuctionWithBids,
     rankings: SupplierRanking[],
     fraudDetection: FraudDetectionResult,
   ): AuctionAnalysisResult {
@@ -510,7 +527,7 @@ export class AnalysisService {
     };
   }
 
-  private toFraudInputs(bids: any[]): BidForFraud[] {
+  private toFraudInputs(bids: AuctionBid[]): BidForFraud[] {
     return bids.map((bid) => ({
       supplierId: bid.supplierId,
       supplierName: bid.supplier.name,
@@ -520,7 +537,7 @@ export class AnalysisService {
     }));
   }
 
-  private toFraudHistoryInputs(histories: any[]) {
+  private toFraudHistoryInputs(histories: AuctionBidHistory[]): BidHistoryForFraud[] {
     return histories.map((history) => ({
       supplierId: history.supplierId,
       amount: this.toNumber(history.amount),

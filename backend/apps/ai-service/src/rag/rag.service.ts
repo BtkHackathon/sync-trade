@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { GeminiService } from '../gemini/gemini.service';
 
 type SupplierContextInput = {
   id: string;
@@ -30,7 +31,10 @@ export class RagService {
   private readonly logger = new Logger(RagService.name);
   private readonly dimensions = 768;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gemini: GeminiService,
+  ) {}
 
   buildSupplierMemory(suppliers: SupplierContextInput[]): string[] {
     return suppliers.map((supplier) => this.buildSupplierContext(supplier));
@@ -42,8 +46,11 @@ export class RagService {
     context?: string;
   }): Promise<void> {
     const context = args.context ?? this.buildSupplierContext(args.supplier);
+
+    // Önce Gemini embedding dene, API key yoksa deterministik fallback kullan
+    const geminiEmbedding = await this.gemini.generateEmbedding(context);
     const embedding = this.toVectorLiteral(
-      this.generateDeterministicEmbedding(context),
+      geminiEmbedding ?? this.generateDeterministicEmbedding(context),
     );
     const id = randomUUID();
 
@@ -95,8 +102,9 @@ export class RagService {
       return [];
     }
 
+    const geminiQueryEmbedding = await this.gemini.generateEmbedding(args.query);
     const queryVector = this.toVectorLiteral(
-      this.generateDeterministicEmbedding(args.query),
+      geminiQueryEmbedding ?? this.generateDeterministicEmbedding(args.query),
     );
     const limit = args.limit ?? 8;
 

@@ -25,7 +25,9 @@ export class ProxyService {
           method: req.method,
           url: targetUrl,
           headers: this.forwardHeaders(req),
-          data: this.shouldSendBody(req.method) ? req.body : undefined,
+          // Multipart form-data için body-parser stream'i tüketmez —
+          // req'i doğrudan stream olarak ilet ki dosya verisi kaybolmasın.
+          data: this.resolveBody(req),
           validateStatus: () => true,
           maxRedirects: 0,
         }),
@@ -102,6 +104,21 @@ export class ProxyService {
     }
 
     return out;
+  }
+
+  private resolveBody(req: Request): unknown {
+    if (!this.shouldSendBody(req.method)) {
+      return undefined;
+    }
+
+    const contentType = (req.headers['content-type'] ?? '').toLowerCase();
+
+    if (contentType.includes('multipart/form-data')) {
+      // Multipart stream'i body-parser dokunmadan iletiyoruz
+      return req;
+    }
+
+    return req.body;
   }
 
   private shouldSendBody(method: string): boolean {

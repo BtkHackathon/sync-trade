@@ -8,12 +8,22 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { CompanyRole, JwtPayload, buildSocketCorsOptions } from '@app/common';
+import { CompanyRole, JwtPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+
+const WS_CORS_ORIGINS = (process.env.CORS_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const CORS_ORIGIN =
+  WS_CORS_ORIGINS.length > 0
+    ? WS_CORS_ORIGINS
+    : ['http://localhost:4000', 'http://localhost:3000', 'http://localhost:5173'];
 
 @WebSocketGateway({
   namespace: '/auctions',
-  cors: buildSocketCorsOptions(),
+  cors: { origin: CORS_ORIGIN, credentials: true },
 })
 export class AuctionGateway implements OnGatewayInit, OnGatewayConnection {
   private readonly logger = new Logger(AuctionGateway.name);
@@ -27,7 +37,7 @@ export class AuctionGateway implements OnGatewayInit, OnGatewayConnection {
   ) {}
 
   afterInit() {
-    this.logger.log('WebSocket namespace /auctions hazir');
+    this.logger.log('WebSocket namespace /auctions hazır');
   }
 
   handleConnection(client: Socket) {

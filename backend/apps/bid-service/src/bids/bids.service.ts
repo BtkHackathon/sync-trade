@@ -62,7 +62,7 @@ export class BidsService {
     } catch (e) {
       if (e instanceof Error && e.message === 'LOCK_NOT_ACQUIRED') {
         throw new ConflictException(
-          'Bu ihaleye su anda cok sayida teklif geliyor. Lutfen birkac saniye sonra tekrar deneyin.',
+          'Bu ihaleye şu anda çok sayıda teklif geliyor. Lütfen birkaç saniye sonra tekrar deneyin.',
         );
       }
       throw e;
@@ -88,24 +88,24 @@ export class BidsService {
           });
 
           if (!auction) {
-            throw new NotFoundException('Ihale bulunamadi.');
+            throw new NotFoundException('İhale bulunamadı.');
           }
 
           if (auction.status !== AuctionStatus.OPEN) {
             throw new BadRequestException(
-              'Sadece acik ihalelere teklif verilebilir.',
+              'Sadece açık ihalelere teklif verilebilir.',
             );
           }
 
           if (auction.endsAt <= new Date()) {
             throw new BadRequestException(
-              'Ihale suresi doldu, teklif kabul edilmiyor.',
+              'İhale süresi doldu, teklif kabul edilmiyor.',
             );
           }
 
           if (auction.buyerId === supplierId) {
             throw new ForbiddenException(
-              'Ihale sahibi kendi ihalesine teklif veremez.',
+              'İhale sahibi kendi ihalesine teklif veremez.',
             );
           }
 
@@ -126,7 +126,7 @@ export class BidsService {
           });
 
           if (!supplier) {
-            throw new NotFoundException('Tedarikci bulunamadi.');
+            throw new NotFoundException('Tedarikçi bulunamadı.');
           }
 
           const existing = await tx.bid.findUnique({
@@ -143,7 +143,7 @@ export class BidsService {
             existing.amount.equals(amount)
           ) {
             throw new BadRequestException(
-              'Ayni tutarda tekrar teklif verilemez.',
+              'Aynı tutarda tekrar teklif verilemez.',
             );
           }
 
@@ -198,7 +198,7 @@ export class BidsService {
           const newLowest = stats._min.amount;
           if (!newLowest) {
             throw new BadRequestException(
-              'Teklif istatistikleri hesaplanamadi.',
+              'Teklif istatistikleri hesaplanamadı.',
             );
           }
 
@@ -247,12 +247,12 @@ export class BidsService {
     });
 
     if (!auction) {
-      throw new NotFoundException('Ihale bulunamadi.');
+      throw new NotFoundException('İhale bulunamadı.');
     }
 
     if (auction.buyerId !== viewer.sub) {
       throw new ForbiddenException(
-        'Bu ihalenin tekliflerini sadece ihale sahibi gorebilir.',
+        'Bu ihalenin tekliflerini sadece ihale sahibi görebilir.',
       );
     }
 
@@ -298,20 +298,20 @@ export class BidsService {
     });
 
     if (!bid) {
-      throw new NotFoundException('Teklif bulunamadi.');
+      throw new NotFoundException('Teklif bulunamadı.');
     }
 
     if (bid.supplierId !== supplierId) {
-      throw new ForbiddenException('Bu teklif size ait degil.');
+      throw new ForbiddenException('Bu teklif size ait değil.');
     }
 
     if (bid.status !== BidStatus.ACTIVE) {
-      throw new BadRequestException('Sadece aktif teklifler geri cekilebilir.');
+      throw new BadRequestException('Sadece aktif teklifler geri çekilebilir.');
     }
 
     if (bid.auction.status !== AuctionStatus.OPEN) {
       throw new BadRequestException(
-        'Ihale acik degilken teklif geri cekilemez.',
+        'İhale açık değilken teklif geri çekilemez.',
       );
     }
 
@@ -321,7 +321,7 @@ export class BidsService {
     } catch (e) {
       if (e instanceof Error && e.message === 'LOCK_NOT_ACQUIRED') {
         throw new ConflictException(
-          'Bu ihaleye su anda cok sayida islem yapiliyor. Lutfen tekrar deneyin.',
+          'Bu ihaleye şu anda çok sayıda işlem yapılıyor. Lütfen tekrar deneyin.',
         );
       }
       throw e;
@@ -345,7 +345,7 @@ export class BidsService {
 
         if (!fresh) {
           throw new BadRequestException(
-            'Teklif geri cekilemedi (durum degisti).',
+            'Teklif geri çekilemedi (durum değişti).',
           );
         }
 
@@ -418,11 +418,11 @@ export class BidsService {
     globalMinActive: Prisma.Decimal | null,
   ) {
     if (amount.lte(0)) {
-      throw new BadRequestException('Teklif tutari sifirdan buyuk olmalidir.');
+      throw new BadRequestException('Teklif tutarı sıfırdan büyük olmalıdır.');
     }
 
     if (amount.gt(maxBudget)) {
-      throw new BadRequestException('Teklif, ihale maksimum butcesini asamaz.');
+      throw new BadRequestException('Teklif, ihale maksimum bütçesini aşamaz.');
     }
 
     if (globalMinActive === null) {
@@ -431,7 +431,7 @@ export class BidsService {
 
     if (!amount.lt(globalMinActive)) {
       throw new BadRequestException(
-        'Tersine ihalede yeni teklif, mevcut en iyi (en dusuk) aktif tekliften dusuk olmalidir.',
+        'Tersine ihalede yeni teklif, mevcut en iyi (en düşük) aktif tekliften düşük olmalıdır.',
       );
     }
   }
@@ -468,18 +468,18 @@ export class BidsService {
     });
 
     if (!company) {
-      throw new NotFoundException('Sirket bulunamadi.');
+      throw new NotFoundException('Şirket bulunamadı.');
     }
 
     if (company.role !== CompanyRole.SUPPLIER) {
       throw new ForbiddenException(
-        'Sadece tedarikci firmalar teklif verebilir.',
+        'Sadece tedarikçi firmalar teklif verebilir.',
       );
     }
 
     if (!company.isVerified) {
       throw new ForbiddenException(
-        'Firma dogrulamasi tamamlanmadan teklif verilemez.',
+        'Firma doğrulaması tamamlanmadan teklif verilemez.',
       );
     }
   }

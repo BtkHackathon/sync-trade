@@ -2,9 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GenerativeModel, GoogleGenerativeAI } from '@google/generative-ai';
 
+const EMBEDDING_MODEL = 'text-embedding-004';
+const EMBEDDING_DIMENSIONS = 768;
+
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
+  private readonly client?: GoogleGenerativeAI;
   private readonly model?: GenerativeModel;
   readonly modelName: string;
 
@@ -19,12 +23,44 @@ export class GeminiService {
       return;
     }
 
-    const client = new GoogleGenerativeAI(apiKey);
-    this.model = client.getGenerativeModel({ model: this.modelName });
+    this.client = new GoogleGenerativeAI(apiKey);
+    this.model = this.client.getGenerativeModel({ model: this.modelName });
   }
 
   get isFallbackMode(): boolean {
     return !this.model;
+  }
+
+  /**
+   * text-embedding-004 ile 768 boyutlu semantik embedding üretir.
+   * API key yoksa ya da hata olursa null döner — çağıran fallback kararını kendisi verir.
+   */
+  async generateEmbedding(text: string): Promise<number[] | null> {
+    if (!this.client) {
+      return null;
+    }
+
+    try {
+      const embeddingModel = this.client.getGenerativeModel({
+        model: EMBEDDING_MODEL,
+      });
+      const result = await embeddingModel.embedContent(text);
+      const values = result.embedding.values;
+
+      if (!values || values.length !== EMBEDDING_DIMENSIONS) {
+        this.logger.warn(
+          `Embedding boyutu beklenenden farklı: ${values?.length ?? 0} (beklenen ${EMBEDDING_DIMENSIONS})`,
+        );
+        return null;
+      }
+
+      return Array.from(values);
+    } catch (error) {
+      this.logger.warn(
+        `Embedding üretilemedi: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
   }
 
   async generateJson<T>(options: {

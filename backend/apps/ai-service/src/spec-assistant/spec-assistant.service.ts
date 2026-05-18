@@ -39,15 +39,11 @@ export class SpecAssistantService {
     }
 
     if (input.file.mimetype === 'application/pdf') {
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: new Uint8Array(input.file.buffer) });
-
-      try {
-        const result = await parser.getText();
-        return result.text.trim();
-      } finally {
-        await parser.destroy();
-      }
+      const pdfParse = require('pdf-parse') as (
+        buffer: Buffer,
+      ) => Promise<{ text: string }>;
+      const result = await pdfParse(input.file.buffer);
+      return result.text.trim();
     }
 
     if (input.file.mimetype.startsWith('text/')) {

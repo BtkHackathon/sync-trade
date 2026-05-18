@@ -5,6 +5,7 @@ import { AllExceptionsFilter } from './filters/all-exceptions.filter';
 import { ResponseInterceptor } from './interceptors/response.interceptor';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { JwtStrategy } from './strategies/jwt.strategy';
 
 /**
  * Global olarak tüm servislere uygulanır.
@@ -12,16 +13,18 @@ import { RolesGuard } from './guards/roles.guard';
  * - ResponseInterceptor: başarılı yanıtları { success, data, timestamp } ile sar
  * - JwtAuthGuard: tüm endpoint'leri JWT ile koru (@Public() ile bypass edilebilir)
  * - RolesGuard: @Roles() decorator'ı ile rol kontrolü
+ * - JwtStrategy: Passport'a "jwt" stratejisini tanıtır; ConfigService ile JWT_SECRET okur
  */
 @Global()
 @Module({
   imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
   providers: [
+    JwtStrategy,
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: ResponseInterceptor },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
-  exports: [PassportModule],
+  exports: [PassportModule, JwtStrategy],
 })
 export class CommonModule {}
