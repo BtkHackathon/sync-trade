@@ -16,57 +16,78 @@ export class FraudService {
       return {
         suspicionLevel: 'NONE',
         suspiciousSuppliers: [],
-        reasoning: 'Fraud pattern analysis needs at least two bids.',
+        reasoning:
+          'Kartel analizi için en az iki bağımsız tedarikçi teklifi gerekmektedir. Mevcut veriyle anlamlı bir örüntü tespiti yapılamamaktadır.',
       };
     }
 
+    // Tedarikçi id → isim haritası (hem score hem de history analizi için)
+    const nameMap = new Map<string, string>(
+      bids.map((b) => [b.supplierId, b.supplierName]),
+    );
+
     const sortedByPrice = [...bids].sort((a, b) => a.amount - b.amount);
     const lowest = sortedByPrice[0].amount;
-    const average =
-      sortedByPrice.reduce((sum, bid) => sum + bid.amount, 0) /
-      sortedByPrice.length;
-    const spreadRatio =
-      (sortedByPrice[sortedByPrice.length - 1].amount - lowest) / average;
+    const highest = sortedByPrice[sortedByPrice.length - 1].amount;
+    const total = sortedByPrice.reduce((sum, bid) => sum + bid.amount, 0);
+    const average = total / sortedByPrice.length;
+    const spreadRatio = (highest - lowest) / average;
+    const spreadPct = Math.round(spreadRatio * 100);
 
     const sortedByTime = [...bids].sort(
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
     );
-    const timeWindowMinutes =
+    const timeWindowMinutes = Math.round(
       (sortedByTime[sortedByTime.length - 1].createdAt.getTime() -
         sortedByTime[0].createdAt.getTime()) /
-      60_000;
+        60_000,
+    );
 
-    const suspiciousSuppliers = new Set<string>();
+    // İsimleri saklayan set
+    const suspiciousNames = new Set<string>();
     const reasons: string[] = [];
     let suspicionLevel: FraudSuspicionLevel = 'LOW';
 
+    // ── Kural 1: Çok dar fiyat aralığı + çok kısa süre ──
     if (spreadRatio < 0.02 && timeWindowMinutes < 5) {
       suspicionLevel = 'HIGH';
-      reasons.push('Bid amounts and timing are unusually parallel.');
-      sortedByPrice.forEach((bid) => suspiciousSuppliers.add(bid.supplierId));
+      const names = sortedByPrice.map((b) => b.supplierName).join(', ');
+      sortedByPrice.forEach((bid) => suspiciousNames.add(bid.supplierName));
+      reasons.push(
+        `Teklif tutarları arasındaki fark yalnızca %${spreadPct} iken tüm teklifler ${timeWindowMinutes < 1 ? 'bir dakikadan kısa' : timeWindowMinutes + ' dakika'} gibi son derece kısa bir süreye sıkışmıştır. ` +
+        `Bu tablo (${names}), tekliflerin önceden koordineli biçimde belirlendiğine dair güçlü bir kartel bulgusunu işaret etmektedir.`,
+      );
     } else if (spreadRatio < 0.05 && timeWindowMinutes < 15) {
       suspicionLevel = 'MEDIUM';
-      reasons.push('Bid spread is narrow inside a short time window.');
       sortedByPrice
-        .slice(0, 3)
-        .forEach((bid) => suspiciousSuppliers.add(bid.supplierId));
+        .slice(0, Math.min(3, sortedByPrice.length))
+        .forEach((bid) => suspiciousNames.add(bid.supplierName));
+      reasons.push(
+        `Teklifler %${spreadPct} gibi dar bir fiyat bandında kümelenmiş ve ${timeWindowMinutes} dakika gibi kısa bir sürede verilmiştir. ` +
+        'Bu örüntü rekabetçi bir piyasayla değil, önceden anlaşılmış fiyatlarla uyumlu görünmektedir.',
+      );
     }
 
+    // ── Kural 2: Anormal düşük fiyat + zayıf profil ──
     for (const bid of sortedByPrice) {
       const tooCheap = bid.amount < average * 0.82;
       const weakProfile = bid.reliabilityScore > 0 && bid.reliabilityScore < 3;
       if (tooCheap && weakProfile) {
-        suspicionLevel = suspicionLevel === 'HIGH' ? 'HIGH' : 'MEDIUM';
-        suspiciousSuppliers.add(bid.supplierId);
+        suspicionLevel = this.maxSuspicion(suspicionLevel, 'MEDIUM');
+        suspiciousNames.add(bid.supplierName);
+        const pctBelow = Math.round(((average - bid.amount) / average) * 100);
         reasons.push(
-          `${bid.supplierName} has a low reliability score and an outlier low bid.`,
+          `${bid.supplierName} ortalama teklifin %${pctBelow} altında bir fiyat önermiş ve güvenilirlik skoru 3/10'un altındadır. ` +
+          'Bu kombinasyon; sözleşme alıp yerine getiremeyen "phantom bid" davranışına veya piyasayı bozma amacına işaret edebilir.',
         );
       }
     }
 
+    // ── Kural 3: IP adresi ve zaman örüntüleri ──
     this.assessHistoryPatterns(
       histories,
-      suspiciousSuppliers,
+      nameMap,
+      suspiciousNames,
       reasons,
       (level) => {
         suspicionLevel = this.maxSuspicion(suspicionLevel, level);
@@ -75,23 +96,25 @@ export class FraudService {
 
     if (reasons.length === 0) {
       return {
-        suspicionLevel: 'LOW',
+        suspicionLevel: 'NONE',
         suspiciousSuppliers: [],
         reasoning:
-          'No strong collusion or outlier pricing pattern was detected.',
+          `${bids.length} teklifin fiyat, zamanlama ve IP analizinde kayda değer bir kartel ya da fiyat anlaşması örüntüsü tespit edilmedi. ` +
+          `Teklif fiyat aralığı %${spreadPct} olup rekabetçi bir dağılım sergileniyor.`,
       };
     }
 
     return {
       suspicionLevel,
-      suspiciousSuppliers: Array.from(suspiciousSuppliers),
+      suspiciousSuppliers: Array.from(suspiciousNames),
       reasoning: reasons.join(' '),
     };
   }
 
   private assessHistoryPatterns(
     histories: BidHistoryForFraud[],
-    suspiciousSuppliers: Set<string>,
+    nameMap: Map<string, string>,
+    suspiciousNames: Set<string>,
     reasons: string[],
     elevate: (level: FraudSuspicionLevel) => void,
   ): void {
@@ -99,42 +122,57 @@ export class FraudService {
       return;
     }
 
+    // ── IP paylaşımı ──
     const byIp = new Map<string, Set<string>>();
     for (const history of histories) {
       if (!history.ipAddress) continue;
-      const suppliers = byIp.get(history.ipAddress) ?? new Set<string>();
-      suppliers.add(history.supplierId);
-      byIp.set(history.ipAddress, suppliers);
+      const ids = byIp.get(history.ipAddress) ?? new Set<string>();
+      ids.add(history.supplierId);
+      byIp.set(history.ipAddress, ids);
     }
 
-    for (const [ipAddress, suppliers] of byIp.entries()) {
-      if (suppliers.size >= 2) {
+    for (const [ipAddress, ids] of byIp.entries()) {
+      if (ids.size >= 2) {
         elevate('HIGH');
-        suppliers.forEach((supplierId) => suspiciousSuppliers.add(supplierId));
+        const names = Array.from(ids).map(
+          (id) => nameMap.get(id) ?? id,
+        );
+        names.forEach((name) => suspiciousNames.add(name));
         reasons.push(
-          `Multiple suppliers submitted bids from the same IP address (${ipAddress}).`,
+          `${names.join(' ve ')} tedarikçilerinin teklifleri aynı IP adresinden (${ipAddress}) iletilmiştir. ` +
+          'Bu durum söz konusu firmaların ortak bir altyapı veya yönetim altında hareket ettiğine dair çok güçlü bir kanıt niteliği taşımaktadır.',
         );
       }
     }
 
+    // ── Çok hızlı sıralı çapraz teklifler ──
     const sorted = [...histories].sort(
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
     );
-    const quickSequence = sorted.some((history, index) => {
+
+    let quickCount = 0;
+    const quickPairs: string[] = [];
+
+    sorted.forEach((history, index) => {
       const previous = sorted[index - 1];
-      if (!previous || previous.supplierId === history.supplierId) {
-        return false;
+      if (!previous || previous.supplierId === history.supplierId) return;
+      const gapMs = history.createdAt.getTime() - previous.createdAt.getTime();
+      if (gapMs < 20_000) {
+        quickCount++;
+        const nameA = nameMap.get(previous.supplierId) ?? previous.supplierId;
+        const nameB = nameMap.get(history.supplierId) ?? history.supplierId;
+        const pair = `${nameA} → ${nameB}`;
+        if (!quickPairs.includes(pair)) quickPairs.push(pair);
+        suspiciousNames.add(nameA);
+        suspiciousNames.add(nameB);
       }
-      return (
-        history.createdAt.getTime() - previous.createdAt.getTime() < 20_000
-      );
     });
 
-    if (quickSequence) {
+    if (quickCount > 0) {
       elevate('MEDIUM');
-      sorted.forEach((history) => suspiciousSuppliers.add(history.supplierId));
       reasons.push(
-        'Cross-supplier bid updates happened within suspiciously short intervals.',
+        `${quickCount} adet farklı tedarikçi çifti teklifini 20 saniyeden kısa aralıklarla güncelledi (${quickPairs.slice(0, 3).join('; ')}). ` +
+        'Bu hız insana özgü bağımsız tepki süreleriyle uyumsuz olup tekliflerin koordineli şekilde yönetildiğine işaret edebilir.',
       );
     }
   }
@@ -149,7 +187,6 @@ export class FraudService {
       MEDIUM: 2,
       HIGH: 3,
     };
-
     return rank[next] > rank[current] ? next : current;
   }
 }

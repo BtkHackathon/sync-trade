@@ -52,9 +52,17 @@ export function timeLeft(endsAt: string | null | undefined): string {
 }
 
 export function riskColor(level: string): string {
-  if (level === 'LOW') return 'text-emerald-700 bg-emerald-100';
-  if (level === 'HIGH') return 'text-red-700 bg-red-100';
+  const l = (level ?? '').toUpperCase();
+  if (l === 'LOW') return 'text-emerald-700 bg-emerald-100';
+  if (l === 'HIGH') return 'text-red-700 bg-red-100';
   return 'text-orange-700 bg-orange-100';
+}
+
+export function riskLabel(level: string): string {
+  const l = (level ?? '').toUpperCase();
+  if (l === 'LOW') return 'Düşük Risk';
+  if (l === 'HIGH') return 'Yüksek Risk';
+  return 'Orta Risk';
 }
 
 export function fraudColor(level: string): string {

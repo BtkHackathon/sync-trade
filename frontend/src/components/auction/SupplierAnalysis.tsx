@@ -55,7 +55,8 @@ export function SupplierAnalysis({ supplierId, supplierName }: SupplierAnalysisP
     onError: () => toast.error('Tedarikçi analizi başarısız.'),
   });
 
-  const colors = report ? RISK_COLORS[report.riskLevel] ?? RISK_COLORS.LOW : null;
+  const normalizedLevel = (report?.riskLevel?.toUpperCase() ?? '') as keyof typeof RISK_COLORS;
+  const colors = report ? (RISK_COLORS[normalizedLevel] ?? RISK_COLORS.MEDIUM) : null;
 
   return (
     <div className="mt-2 space-y-2">
@@ -104,11 +105,11 @@ export function SupplierAnalysis({ supplierId, supplierName }: SupplierAnalysisP
             <span
               className={`text-xs font-bold px-2 py-0.5 rounded-full ${colors.bg} ${colors.text} border ${colors.border}`}
             >
-              {report.riskLevel === 'LOW'
+              {normalizedLevel === 'LOW'
                 ? 'Düşük Risk'
-                : report.riskLevel === 'MEDIUM'
-                ? 'Orta Risk'
-                : 'Yüksek Risk'}
+                : normalizedLevel === 'HIGH'
+                ? 'Yüksek Risk'
+                : 'Orta Risk'}
             </span>
           </div>
 

@@ -109,12 +109,12 @@ export function FraudDetection({ auctionId, bidCount }: FraudDetectionProps) {
             </div>
             <div>
               <p className="text-sm font-semibold text-[#0F172A]">
-                Gemini AI — Kartel & Fiyat Anlaşması Tespiti
+                Kartel & Fiyat Anlaşması Tespiti
               </p>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-md">
-                AI, tedarikçilerin teklif fiyatları arasındaki örüntüleri analiz ederek
-                olası fiyat anlaşmalarını, kartel davranışlarını ve IP bazlı şüpheli
-                koordinasyonu tespit eder.
+                Teklif fiyat aralığı, zamanlama örüntüleri, IP adresi paylaşımı ve
+                güvenilirlik-fiyat uyumsuzluğu gibi göstergeler istatistiksel olarak
+                analiz edilerek olası kartel davranışı tespit edilir.
               </p>
               <div className="flex items-center gap-3 mt-2">
                 <span className="inline-flex items-center gap-1 text-xs text-slate-500">
@@ -123,7 +123,7 @@ export function FraudDetection({ auctionId, bidCount }: FraudDetectionProps) {
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs text-blue-600">
                   <Zap className="w-3.5 h-3.5" />
-                  Gemini AI destekli
+                  İstatistiksel örüntü analizi
                 </span>
               </div>
             </div>
@@ -178,7 +178,7 @@ export function FraudDetection({ auctionId, bidCount }: FraudDetectionProps) {
                   </span>
                 </div>
                 <p className={`text-xs mt-0.5 ${cfg.text} opacity-80`}>
-                  Gemini AI tarafından {bidCount} teklif üzerinden hesaplandı
+                  {bidCount} teklif istatistiksel olarak analiz edildi
                 </p>
               </div>
             </div>

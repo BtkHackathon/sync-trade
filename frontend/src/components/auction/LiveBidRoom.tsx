@@ -210,7 +210,7 @@ export function LiveBidRoom({ auctionId, bids, lowestBidAmount, isBuyer, isOpen 
             <div className="col-span-3 text-right">Teklif</div>
             <div className="col-span-2 text-right hidden sm:block">Fark</div>
             {!isBuyer && <div className="col-span-2 text-right hidden sm:block">Zaman</div>}
-            {isBuyer && <div className="col-span-2 text-right hidden sm:block">Skor</div>}
+            {isBuyer && <div className="col-span-2 text-right hidden sm:block">Güvenilirlik</div>}
           </div>
 
           {displayBids.map((bid, idx) => {
@@ -294,15 +294,15 @@ export function LiveBidRoom({ auctionId, bids, lowestBidAmount, isBuyer, isOpen 
                   {/* Güvenilirlik skoru (buyer) veya zaman (supplier) */}
                   <div className="col-span-2 text-right hidden sm:block">
                     {isBuyer ? (
-                      reliabilityScore !== undefined ? (
+                      reliabilityScore !== undefined && reliabilityScore !== null ? (
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                          reliabilityScore >= 80
+                          reliabilityScore >= 8
                             ? 'bg-emerald-100 text-emerald-700'
-                            : reliabilityScore >= 50
+                            : reliabilityScore >= 5
                             ? 'bg-orange-100 text-orange-700'
                             : 'bg-red-100 text-red-700'
                         }`}>
-                          {reliabilityScore}/100
+                          {reliabilityScore.toFixed(1)}/10
                         </span>
                       ) : (
                         <span className="text-xs text-slate-400">—</span>

@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { aiApi } from '@/lib/api';
-import { formatCurrency, riskColor, fraudColor } from '@/lib/utils';
+import { formatCurrency, riskColor, riskLabel, fraudColor } from '@/lib/utils';
 import type { AiReport, ApiResponse, SupplierRanking } from '@/types';
 
 interface AIDashboardProps {
@@ -124,7 +124,7 @@ function RankingRow({ ranking, onAward, delay }: { ranking: SupplierRanking; onA
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-[#0F172A] truncate">{ranking.supplierName}</p>
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${riskColor(ranking.riskLevel)}`}>
-            {ranking.riskLevel === 'LOW' ? 'Düşük Risk' : ranking.riskLevel === 'MEDIUM' ? 'Orta Risk' : 'Yüksek Risk'}
+            {riskLabel(ranking.riskLevel)}
           </span>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -418,7 +418,13 @@ export function AIDashboard({ auctionId, isOwner = false, onAward }: AIDashboard
             <CircularScore score={Math.round(winnerRanking.reliabilityScore * 10)} label="Güvenilirlik" />
             <CircularScore score={winnerRanking.aiScore} label="AI Skoru" />
             <CircularScore
-              score={winnerRanking.riskLevel === 'LOW' ? 90 : winnerRanking.riskLevel === 'MEDIUM' ? 55 : 20}
+              score={
+                (winnerRanking.riskLevel ?? '').toUpperCase() === 'LOW'
+                  ? 90
+                  : (winnerRanking.riskLevel ?? '').toUpperCase() === 'MEDIUM'
+                  ? 55
+                  : 20
+              }
               label="Risk Uyumu"
             />
           </div>
